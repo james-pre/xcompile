@@ -6,11 +6,6 @@ export interface Token {
 	position: number;
 }
 
-export interface CompositePart {
-	kind: string;
-	optional?: boolean;
-}
-
 export type TokenType = 'literal' | 'composite' | 'union';
 
 export interface GenericTokenLike {
@@ -24,17 +19,17 @@ export interface LiteralToken extends GenericTokenLike {
 	pattern: RegExp;
 }
 
+export interface TokenReference {
+	kind: string;
+	optional?: boolean;
+}
+
 export interface CompositeToken extends GenericTokenLike {
-	type: 'composite';
-	pattern: CompositePart[];
+	type: 'composite' | 'oneof';
+	pattern: (string | TokenReference)[];
 }
 
-export interface OneofToken extends GenericTokenLike {
-	type: 'oneof';
-	pattern: string[];
-}
-
-export type GenericToken = LiteralToken | CompositeToken | OneofToken;
+export type GenericToken = LiteralToken | CompositeToken;
 
 export function tokenize(source: string, genericTokens: Iterable<GenericToken>): Token[] {
 	const tokens: Token[] = [];

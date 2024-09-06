@@ -20,10 +20,10 @@ const genericTokens: GenericToken[] = [
 	{
 		name: 'operand_list_continue',
 		type: 'composite',
-		pattern: [{ kind: ',' }, { kind: 'whitespace', optional: true }, { kind: 'operand' }, { kind: 'operand_list_continue', optional: true }],
+		pattern: ['comma', { kind: 'whitespace', optional: true }, 'operand', { kind: 'operand_list_continue', optional: true }],
 	},
-	{ name: 'operand_list', type: 'composite', pattern: [{ kind: 'operand' }, { kind: 'operand_list_continue', optional: true }] },
-	{ name: 'instruction', type: 'composite', pattern: [{ kind: 'identifier' }, { kind: 'whitespace' }, { kind: 'operand_list', optional: true }] },
+	{ name: 'operand_list', type: 'composite', pattern: ['operand', { kind: 'operand_list_continue', optional: true }] },
+	{ name: 'instruction', type: 'composite', pattern: ['identifier', 'whitespace', { kind: 'operand_list', optional: true }] },
 ];
 
 const source = readFileSync(input, 'utf8');
