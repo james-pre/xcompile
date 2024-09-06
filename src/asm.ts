@@ -10,22 +10,15 @@ const {
 });
 
 const genericTokens: GenericToken[] = [
-	{ name: 'register', type: 'literal', pattern: /^%(\w+)/ },
-	{ name: 'immediate', type: 'literal', pattern: /^\$((0x)?(\d+))/ },
-	{ name: 'address', type: 'literal', pattern: /^((0x)?(\d+))/ },
-	{ name: 'identifier', type: 'literal', pattern: /^(\w+)/ },
-	{ name: 'whitespace', type: 'literal', pattern: /^(\s+)/ },
-	{ name: 'comma', type: 'literal', pattern: /^(,)/ },
-	{
-		name: 'operand',
-		type: 'union',
-		pattern: ['register', 'immediate', 'address'],
-	},
-	{
-		name: 'operand_list',
-		type: 'composite',
-		pattern: [{ kind: 'operand' }, { kind: 'operand_list_continue', optional: true }],
-	},
+	{ name: 'register', type: 'literal', pattern: /^%\w+/ },
+	{ name: 'immediate', type: 'literal', pattern: /^\$(0x)?\d+/ },
+	{ name: 'address', type: 'literal', pattern: /^(0x)?\d+/ },
+	{ name: 'instruction', type: 'literal', pattern: /^\w+/ },
+	{ name: 'whitespace', type: 'literal', pattern: /^\s+/ },
+	{ name: 'comma', type: 'literal', pattern: /^,/ },
+	{ name: 'operand', type: 'union', pattern: ['register', 'immediate', 'address'] },
+	{ name: 'operand_list_continue', type: 'composite', pattern: [{ kind: ',' }, { kind: 'operand' }, { kind: 'operand_list_continue', optional: true }] },
+	{ name: 'operand_list', type: 'composite', pattern: [{ kind: 'operand' }, { kind: 'operand_list_continue', optional: true }] },
 ];
 
 const source = readFileSync(input, 'utf8');

@@ -3,10 +3,7 @@ export interface Token {
 	text: string;
 	line: number;
 	column: number;
-}
-
-export interface Node extends Token {
-	children: Node[];
+	position: number;
 }
 
 export interface CompositePart {
@@ -53,15 +50,10 @@ export function tokenize(source: string, genericTokens: Iterable<GenericToken>):
 				continue;
 			}
 			const match = pattern.exec(source.slice(position));
-			if (!match) {
-				continue;
+			if (match) {
+				token = { kind: name, text: match[0], line, column, position };
+				break;
 			}
-			token = {
-				kind: name,
-				text: match[0],
-				line,
-				column,
-			};
 		}
 
 		if (!token) {
