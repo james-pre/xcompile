@@ -6,32 +6,12 @@ export interface Token {
 	position: number;
 }
 
-export type TokenType = 'literal' | 'composite' | 'union';
-
-export interface GenericTokenLike {
-	type: string;
+export interface TokenDefinition {
 	name: string;
-	pattern: unknown;
-}
-
-export interface LiteralToken extends GenericTokenLike {
-	type: 'literal';
 	pattern: RegExp;
 }
 
-export interface TokenReference {
-	kind: string;
-	optional?: boolean;
-}
-
-export interface CompositeToken extends GenericTokenLike {
-	type: 'composite' | 'oneof';
-	pattern: (string | TokenReference)[];
-}
-
-export type GenericToken = LiteralToken | CompositeToken;
-
-export function tokenize(source: string, genericTokens: Iterable<GenericToken>): Token[] {
+export function tokenize(source: string, definitions: Iterable<TokenDefinition>): Token[] {
 	const tokens: Token[] = [];
 
 	let line = 1;
@@ -40,10 +20,7 @@ export function tokenize(source: string, genericTokens: Iterable<GenericToken>):
 
 	while (position < source.length) {
 		let token: Token | undefined;
-		for (const { name, pattern, type } of genericTokens) {
-			if (type != 'literal') {
-				continue;
-			}
+		for (const { name, pattern } of definitions) {
 			const match = pattern.exec(source.slice(position));
 			if (match) {
 				token = { kind: name, text: match[0], line, column, position };

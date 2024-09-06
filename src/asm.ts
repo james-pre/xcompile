@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
-import { GenericToken, tokenize } from './tokens';
+import { TokenDefinition, tokenize } from './tokens';
 import { inspect, parseArgs } from 'node:util';
+import type { NodeDefinition } from './parser';
 
 const {
 	positionals: [input],
@@ -9,13 +10,16 @@ const {
 	allowPositionals: true,
 });
 
-const genericTokens: GenericToken[] = [
-	{ name: 'register', type: 'literal', pattern: /^%\w+/ },
-	{ name: 'immediate', type: 'literal', pattern: /^\$(0x)?\d+/ },
-	{ name: 'address', type: 'literal', pattern: /^(0x)?\d+/ },
-	{ name: 'identifier', type: 'literal', pattern: /^\w+/ },
-	{ name: 'whitespace', type: 'literal', pattern: /^\s+/ },
-	{ name: 'comma', type: 'literal', pattern: /^,/ },
+const tokenDefinitions: TokenDefinition[] = [
+	{ name: 'register', pattern: /^%\w+/ },
+	{ name: 'immediate', pattern: /^\$(0x)?\d+/ },
+	{ name: 'address', pattern: /^(0x)?\d+/ },
+	{ name: 'identifier', pattern: /^\w+/ },
+	{ name: 'whitespace', pattern: /^\s+/ },
+	{ name: 'comma', pattern: /^,/ },
+];
+
+const nodeDefinitions: NodeDefinition[] = [
 	{ name: 'operand', type: 'oneof', pattern: ['register', 'immediate', 'address'] },
 	{
 		name: 'operand_list_continue',
@@ -28,8 +32,9 @@ const genericTokens: GenericToken[] = [
 
 const source = readFileSync(input, 'utf8');
 
-const tokens = tokenize(source, genericTokens);
+const tokens = tokenize(source, tokenDefinitions);
 
+console.log('Tokens:\n');
 for (const token of tokens) {
 	console.log(inspect(token, { colors: true, compact: true }));
 }
