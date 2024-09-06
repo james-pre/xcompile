@@ -1,4 +1,4 @@
-import type { GenericToken, Token } from './tokenizer';
+import type { GenericToken, Token } from './tokens';
 
 export interface Node extends Token {
 	children: Node[];

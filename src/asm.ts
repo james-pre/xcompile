@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { GenericToken, tokenize } from './tokenizer';
+import { GenericToken, tokenize } from './tokens';
 import { inspect, parseArgs } from 'node:util';
 
 const {
