@@ -1,43 +1,68 @@
-interface Token {
+export interface Token {
 	kind: string;
 	text: string;
 	line: number;
 	column: number;
 }
 
-interface Node extends Token {
+export interface Node extends Token {
 	children: Node[];
 }
 
-interface GenericToken {
+export interface CompositePart {
+	kind: string;
+	optional?: boolean;
+}
+
+export type TokenType = 'literal' | 'composite' | 'union';
+
+export interface GenericTokenLike {
+	type: string;
 	name: string;
+	pattern: unknown;
+}
+
+export interface LiteralToken extends GenericTokenLike {
+	type: 'literal';
 	pattern: RegExp;
 }
 
-function findNextToken(source: string, genericTokens: GenericToken, position: number, line: number, column: number): Token | null {
-	for (const { name, pattern } of genericTokens) {
-		const match = pattern.exec(source.slice(position));
-		if (!match) {
-			continue;
-		}
-		return {
-			kind: name,
-			text: match[0],
-			line,
-			column,
-		};
-	}
-	return null;
+export interface CompositeToken extends GenericTokenLike {
+	type: 'composite';
+	pattern: CompositePart[];
 }
 
-export function tokenize(source: string, genericTokens: GenericToken): Token[] {
+export interface UnionToken extends GenericTokenLike {
+	type: 'union';
+	pattern: string[];
+}
+
+export type GenericToken = LiteralToken | CompositeToken | UnionToken;
+
+export function tokenize(source: string, genericTokens: Iterable<GenericToken>): Token[] {
 	const tokens: Token[] = [];
+
 	let line = 1;
 	let column = 0;
 	let position = 0;
 
 	while (position < source.length) {
-		const token = findNextToken(source, position, line, column);
+		let token: Token | undefined;
+		for (const { name, pattern, type } of genericTokens) {
+			if (type != 'literal') {
+				continue;
+			}
+			const match = pattern.exec(source.slice(position));
+			if (!match) {
+				continue;
+			}
+			token = {
+				kind: name,
+				text: match[0],
+				line,
+				column,
+			};
+		}
 
 		if (!token) {
 			throw new Error(`Unexpected token "${source[position - 1]}" at line ${line}, column ${column}`);
