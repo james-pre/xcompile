@@ -29,12 +29,12 @@ export interface CompositeToken extends GenericTokenLike {
 	pattern: CompositePart[];
 }
 
-export interface UnionToken extends GenericTokenLike {
-	type: 'union';
+export interface OneofToken extends GenericTokenLike {
+	type: 'oneof';
 	pattern: string[];
 }
 
-export type GenericToken = LiteralToken | CompositeToken | UnionToken;
+export type GenericToken = LiteralToken | CompositeToken | OneofToken;
 
 export function tokenize(source: string, genericTokens: Iterable<GenericToken>): Token[] {
 	const tokens: Token[] = [];
