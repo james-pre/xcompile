@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
-import { inspect, parseArgs } from 'node:util';
-import { TokenDefinition, tokenize } from './tokens';
-import { parse } from './parser';
+import { parseArgs } from 'node:util';
+import { parse, stringifyNode } from '../src/parser';
+import { tokenize } from '../src/tokens';
 
 const {
 	positionals: [input],
@@ -10,27 +10,16 @@ const {
 	allowPositionals: true,
 });
 
-const tokenDefinitions: TokenDefinition[] = [
-	{ name: 'register', pattern: /^%\w+/ },
-	{ name: 'immediate', pattern: /^\$(0x)?\d+/ },
-	{ name: 'address', pattern: /^(0x)?\d+/ },
-	{ name: 'identifier', pattern: /^\w+/ },
-	{ name: 'whitespace', pattern: /^[ 	]+/ },
-	{ name: 'line_terminator', pattern: /^[\n;]+/ },
-	{ name: 'comma', pattern: /^,/ },
-];
-
-const source = readFileSync(input, 'utf8');
-
-const tokens = tokenize(source, tokenDefinitions);
-
-console.log('Tokens:\n');
-for (const token of tokens) {
-	console.log(inspect(token, { colors: true, compact: true }));
-}
-
 const ast = parse({
-	tokens,
+	tokens: tokenize(readFileSync(input, 'utf8'), [
+		{ name: 'register', pattern: /^%\w+/ },
+		{ name: 'immediate', pattern: /^\$(0x)?\d+/ },
+		{ name: 'address', pattern: /^(0x)?\d+/ },
+		{ name: 'identifier', pattern: /^\w+/ },
+		{ name: 'whitespace', pattern: /^[ 	]+/ },
+		{ name: 'line_terminator', pattern: /^[\n;]+/ },
+		{ name: 'comma', pattern: /^,/ },
+	]),
 	literals: ['register', 'immediate', 'address', 'identifier', 'whitespace', 'line_terminator', 'comma'],
 	definitions: [
 		{ name: 'operand', type: 'oneof', pattern: ['register', 'immediate', 'address'] },
@@ -49,10 +38,9 @@ const ast = parse({
 		{ name: 'instruction_list', type: 'composite', pattern: ['instruction', { kind: 'whitespace', optional: true }, { kind: 'instruction_list_continue', optional: true }] },
 	],
 	rootNode: 'instruction_list',
-	debug: console.log,
 });
 
-console.log('\n\nAST:\n');
+console.log('AST:\n');
 for (const node of ast) {
-	console.log(inspect(node, { colors: true, compact: true, depth: null }));
+	console.log(stringifyNode(node));
 }

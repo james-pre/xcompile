@@ -1,4 +1,4 @@
-import type { Token } from './tokens';
+import { type Token } from './tokens';
 
 export interface DefinitionReference {
 	kind: string;
@@ -12,7 +12,14 @@ export interface NodeDefinition {
 }
 
 export interface Node extends Token {
-	children: Node[];
+	children?: Node[];
+}
+
+export function stringifyNode(node: Node, depth = 0): string {
+	return (
+		`${node.kind}${node?.children?.length ? '' : ` "${node.text.replaceAll('\n', '\\n')}"`} ${node.line}:${node.column}` +
+		node?.children?.map((child) => '\n' + '    '.repeat(depth + 1) + stringifyNode(child, depth + 1))
+	);
 }
 
 export interface ParseOptions {
