@@ -1,0 +1,21 @@
+Register 		: literal %\w+
+Immediate 		: literal \$(0x)?\d+
+Address 		: literal (0x)?\d+
+Identifier 		: literal \w+
+Whitespace 		: literal [ 	]+
+LineTerminator 	: literal [\n;]+
+Comma 			: literal ,
+
+
+
+Operand : oneof Register Immediate Number
+
+OperandListContinue : ',' Whitespace? Operand OperandListContinue?
+
+OperandList : Operand OperandListContinue?
+
+Instruction : Identifier OperandList?
+
+InstructionListContinue : LineTerminator? Whitespace? Instruction InstructionListContinue?
+
+root InstructionList : Instruction Whitespace? InstructionList?

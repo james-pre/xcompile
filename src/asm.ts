@@ -39,16 +39,17 @@ const ast = parse({
 			type: 'composite',
 			pattern: ['comma', { kind: 'whitespace', optional: true }, 'operand', { kind: 'operand_list_continue', optional: true }],
 		},
-		{ name: 'operand_list', type: 'composite', pattern: ['operand', { kind: 'operand_list_continue', optional: true }] },
-		{ name: 'instruction', type: 'composite', pattern: ['identifier', 'whitespace', { kind: 'operand_list', optional: true }] },
+		{ name: 'operand_list', type: 'composite', pattern: [{ kind: 'whitespace', optional: true }, 'operand', { kind: 'operand_list_continue', optional: true }] },
+		{ name: 'instruction', type: 'composite', pattern: ['identifier', { kind: 'operand_list', optional: true }] },
 		{
 			name: 'instruction_list_continue',
 			type: 'composite',
-			pattern: ['line_terminator', { kind: 'whitespace', optional: true }, 'instruction', { kind: 'instruction_list_continue', optional: true }],
+			pattern: [{ kind: 'line_terminator', optional: true }, { kind: 'whitespace', optional: true }, 'instruction', { kind: 'instruction_list_continue', optional: true }],
 		},
-		{ name: 'instruction_list', type: 'composite', pattern: ['instruction', { kind: 'whitespace', optional: true }, 'instruction_list_continue'] },
+		{ name: 'instruction_list', type: 'composite', pattern: ['instruction', { kind: 'whitespace', optional: true }, { kind: 'instruction_list_continue', optional: true }] },
 	],
 	rootNode: 'instruction_list',
+	debug: console.log,
 });
 
 console.log('\n\nAST:\n');
