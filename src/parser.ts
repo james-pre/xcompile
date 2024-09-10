@@ -1,14 +1,14 @@
 import { tokenize, type Token, type TokenDefinition } from './tokens';
 
-export interface DefinitionReference {
+export interface DefinitionPart {
 	kind: string;
-	optional?: boolean;
+	type: 'required' | 'optional' | 'repeated';
 }
 
 export interface NodeDefinition {
 	name: string;
-	type: 'composite' | 'oneof';
-	pattern: (string | DefinitionReference)[];
+	type: 'sequence' | 'oneof';
+	pattern: (string | DefinitionPart)[];
 }
 
 export interface Node extends Token {
@@ -66,7 +66,7 @@ export function parse({ definitions, rootNode, debug: _debug = () => {}, ...rest
 			throw new Error(`Definition for node "${kind}" not found`);
 		}
 
-		const pattern = definition.pattern.map((part) => (typeof part === 'string' ? { kind: part, optional: false } : part));
+		const pattern = definition.pattern.map((part) => (typeof part === 'string' ? { kind: part, type: 'required' } : part));
 
 		switch (definition.type) {
 			case 'oneof': {
@@ -78,23 +78,30 @@ export function parse({ definitions, rootNode, debug: _debug = () => {}, ...rest
 				debug('Warning: No matches for oneof');
 				return null;
 			}
-			case 'composite': {
+			case 'sequence': {
 				const children: Node[] = [];
 				const start = position;
 
-				debug(`Parsing composite "${kind}"`);
+				debug(`Parsing sequence "${kind}"`);
 				for (const part of pattern) {
+					if (part.type == 'repeated') {
+						let repeatedNode: Node | null;
+						while ((repeatedNode = parseNode(part.kind, depth + 1))) {
+							children.push(repeatedNode);
+						}
+						break;
+					}
 					const node = parseNode(part.kind, depth + 1);
 					if (node) {
 						children.push(node);
-					} else if (!part.optional) {
+					} else if (part.type != 'optional') {
 						position = start; // Rollback
 						return null;
 					}
 				}
 
 				const token = tokens[start];
-				debug(`Composite "${kind}" at ${token.line}:${token.column}`);
+				debug(`Sequence "${kind}" at ${token.line}:${token.column}`);
 				return {
 					kind: definition.name,
 					text: token.text,

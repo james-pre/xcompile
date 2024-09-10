@@ -4,8 +4,11 @@ import { parse, stringifyNode } from '../src/parser';
 
 const {
 	positionals: [input],
+	values: { verbose },
 } = parseArgs({
-	options: {},
+	options: {
+		verbose: { type: 'boolean', short: 'w', default: false },
+	},
 	allowPositionals: true,
 });
 
@@ -24,19 +27,20 @@ const ast = parse({
 		{ name: 'operand', type: 'oneof', pattern: ['register', 'immediate', 'address'] },
 		{
 			name: 'operand_list_continue',
-			type: 'composite',
-			pattern: [{ kind: 'whitespace', optional: true }, 'comma', { kind: 'whitespace', optional: true }, 'operand', { kind: 'operand_list_continue', optional: true }],
+			type: 'sequence',
+			pattern: [{ kind: 'whitespace', type: 'optional' }, 'comma', { kind: 'whitespace', type: 'optional' }, 'operand'],
 		},
-		{ name: 'operand_list', type: 'composite', pattern: [{ kind: 'whitespace', optional: true }, 'operand', { kind: 'operand_list_continue', optional: true }] },
-		{ name: 'instruction', type: 'composite', pattern: ['identifier', { kind: 'operand_list', optional: true }] },
+		{ name: 'operand_list', type: 'sequence', pattern: [{ kind: 'whitespace', type: 'optional' }, 'operand', { kind: 'operand_list_continue', type: 'repeated' }] },
+		{ name: 'instruction', type: 'sequence', pattern: ['identifier', { kind: 'operand_list', type: 'optional' }] },
 		{
 			name: 'instruction_list_continue',
-			type: 'composite',
-			pattern: [{ kind: 'line_terminator', optional: true }, { kind: 'whitespace', optional: true }, 'instruction', { kind: 'instruction_list_continue', optional: true }],
+			type: 'sequence',
+			pattern: [{ kind: 'line_terminator', type: 'optional' }, { kind: 'whitespace', type: 'optional' }, 'instruction'],
 		},
-		{ name: 'instruction_list', type: 'composite', pattern: ['instruction', { kind: 'whitespace', optional: true }, { kind: 'instruction_list_continue', optional: true }] },
+		{ name: 'instruction_list', type: 'sequence', pattern: ['instruction', { kind: 'whitespace', type: 'optional' }, { kind: 'instruction_list_continue', type: 'repeated' }] },
 	],
 	rootNode: 'instruction_list',
+	debug: verbose ? console.debug : undefined,
 });
 
 console.log('AST:\n');
