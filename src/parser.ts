@@ -1,4 +1,4 @@
-import { type Token } from './tokens';
+import { tokenize, type Token, type TokenDefinition } from './tokens';
 
 export interface DefinitionReference {
 	kind: string;
@@ -17,21 +17,34 @@ export interface Node extends Token {
 
 export function stringifyNode(node: Node, depth = 0): string {
 	return (
-		`${node.kind}${node?.children?.length ? '' : ` "${node.text.replaceAll('\n', '\\n')}"`} ${node.line}:${node.column}` +
+		`${node.kind}${node?.children?.length ? '' : ` "${node.text.replaceAll('\n', '\\n').replaceAll('\t', '\\t')}"`} ${node.line}:${node.column}` +
 		node?.children?.map((child) => '\n' + '    '.repeat(depth + 1) + stringifyNode(child, depth + 1))
 	);
 }
 
-export interface ParseOptions {
-	tokens: Token[];
+export interface ParseOptionsShared {
 	definitions: NodeDefinition[];
-	literals: string[];
 	rootNode: string;
 	debug?(message: string): void;
 }
 
-export function parse({ tokens, literals, definitions, rootNode, debug: _debug = () => {} }: ParseOptions): Node[] {
+interface ParseTokenize extends ParseOptionsShared {
+	source: string;
+	literals: Iterable<TokenDefinition>;
+}
+
+interface ParseOnly extends ParseOptionsShared {
+	tokens: Token[];
+	literals: string[];
+}
+
+export type ParseOptions = ParseOnly | ParseTokenize;
+
+export function parse({ definitions, rootNode, debug: _debug = () => {}, ...rest }: ParseOptions): Node[] {
 	let position = 0;
+
+	const tokens = 'tokens' in rest ? rest.tokens : tokenize(rest.source, rest.literals);
+	const literals = 'tokens' in rest ? rest.literals : [...rest.literals].map((literal) => literal.name);
 
 	function parseNode(kind: string, depth = 0): Node | null {
 		const debug = (message: string): unknown => _debug('  '.repeat(depth) + message);

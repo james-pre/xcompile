@@ -16,7 +16,7 @@ const ast = parse({
 		{ name: 'immediate', pattern: /^\$(0x)?\d+/ },
 		{ name: 'address', pattern: /^(0x)?\d+/ },
 		{ name: 'identifier', pattern: /^\w+/ },
-		{ name: 'whitespace', pattern: /^[ 	]+/ },
+		{ name: 'whitespace', pattern: /^[ \t]+/ },
 		{ name: 'line_terminator', pattern: /^[\n;]+/ },
 		{ name: 'comma', pattern: /^,/ },
 	]),
@@ -26,7 +26,7 @@ const ast = parse({
 		{
 			name: 'operand_list_continue',
 			type: 'composite',
-			pattern: ['comma', { kind: 'whitespace', optional: true }, 'operand', { kind: 'operand_list_continue', optional: true }],
+			pattern: [{ kind: 'whitespace', optional: true }, 'comma', { kind: 'whitespace', optional: true }, 'operand', { kind: 'operand_list_continue', optional: true }],
 		},
 		{ name: 'operand_list', type: 'composite', pattern: [{ kind: 'whitespace', optional: true }, 'operand', { kind: 'operand_list_continue', optional: true }] },
 		{ name: 'instruction', type: 'composite', pattern: ['identifier', { kind: 'operand_list', optional: true }] },

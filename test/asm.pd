@@ -4,18 +4,17 @@ Address 		: literal (0x)?\d+
 Identifier 		: literal \w+
 Whitespace 		: literal [ 	]+
 LineTerminator 	: literal [\n;]+
-Comma 			: literal ,
-
-
 
 Operand : oneof Register Immediate Number
 
-OperandListContinue : ',' Whitespace? Operand OperandListContinue?
+OperandListContinue : Whitespace? "," Whitespace? Operand OperandListContinue?
 
-OperandList : Operand OperandListContinue?
+OperandList : Whitespace? Operand OperandListContinue?
 
 Instruction : Identifier OperandList?
 
 InstructionListContinue : LineTerminator? Whitespace? Instruction InstructionListContinue?
 
-root InstructionList : Instruction Whitespace? InstructionList?
+InstructionList : Whitespace? Instruction Whitespace? InstructionList?
+
+> InstructionList
