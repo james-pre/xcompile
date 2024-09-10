@@ -78,15 +78,23 @@ export function parseBnfAst(source: string, verbose: number = 0): Node[] {
 	});
 }
 
-export function convertAst(ast: Node): { definitions: NodeDefinition[]; literals: TokenDefinition[] } {
+export function convertAst(ast: Node, verbose: number = 0): { definitions: NodeDefinition[]; literals: TokenDefinition[] } {
+	function _log(level: number, depth: number, message: string) {
+		if (level >= verbose) {
+			console.debug('  '.repeat(depth), message);
+		}
+	}
+
 	const definitions: NodeDefinition[] = [];
 	const literals: TokenDefinition[] = [];
 
-	function processNode(node: Node) {
+	function processNode(node: Node, depth: number = 0) {
+		const log = (level: number, text: string) => _log(level, depth, text);
+		log(3, `Processing ${node.kind} at ${node.line}:${node.column}`);
 		if (node.kind != 'rule') {
 			// Recursively process child nodes
 			for (const child of node.children || []) {
-				processNode(child);
+				processNode(child, depth + 1);
 			}
 			return;
 		}
@@ -95,10 +103,14 @@ export function convertAst(ast: Node): { definitions: NodeDefinition[]; literals
 		const name = node.children?.find((child) => child.kind === 'identifier')?.text;
 		const expression = node.children?.find((child) => child.kind === 'expression');
 
-		if (!name || !expression) return;
+		log(2, `Found rule "${name}" at ${node.line}:${node.column}`);
+		if (!name || !expression) {
+			log(1, 'Rule is missing name or expression');
+			return;
+		}
 
 		// Convert the expression node to a pattern
-		const pattern = processExpression(expression);
+		const pattern = processExpression(expression, depth + 1);
 
 		// Add the NodeDefinition for this rule
 		definitions.push({
@@ -108,25 +120,30 @@ export function convertAst(ast: Node): { definitions: NodeDefinition[]; literals
 		});
 	}
 
-	function processExpression(expressionNode: Node): DefinitionPart[] {
+	function processExpression(expression: Node, depth: number = 0): DefinitionPart[] {
+		const log = (level: number, text: string) => _log(level, depth, text);
 		const pattern: DefinitionPart[] = [];
 		let inOneOf = false; // To track whether we're in an alternation (`|`)
 
-		for (const child of expressionNode.children || []) {
+		for (const child of expression.children || []) {
 			if (child.kind == 'pipe') {
 				inOneOf = true;
+				log(2, 'Found pipe in expression');
 				continue;
 			}
 
 			if (child.kind != 'term' && child.kind != 'term_continue') {
+				log(2, 'Expression child not term or term_continue');
 				continue;
 			}
 
+			log(2, `Parsing factor: ${child.kind} "${child.text}" at ${child.line}:${child.column}`);
 			for (const factor of child.children || []) {
 				const factorChild = factor.children?.[0];
 
 				if (!factorChild) continue; // Skip if there's no factorChild
 
+				log(2, `Parsing factor child: ${factorChild.kind} "${factorChild.text}" at ${factorChild.line}:${factorChild.column}`);
 				switch (factorChild.kind) {
 					case 'string': {
 						const literalText = factorChild.text.replace(/^"|"$/g, ''); // Strip quotes
@@ -144,13 +161,15 @@ export function convertAst(ast: Node): { definitions: NodeDefinition[]; literals
 					case 'left_brace': {
 						const innerExpression = factor.children?.find((grandchild: Node) => grandchild.kind === 'expression');
 						if (innerExpression) {
-							const subPattern = processExpression(innerExpression);
+							const subPattern = processExpression(innerExpression, depth + 1);
 							const repeatType = factorChild.kind === 'left_bracket' ? 'optional' : 'repeated';
 							subPattern.forEach((sub) => pattern.push({ ...sub, type: repeatType }));
 						}
 						break;
 					}
 					default:
+						log(1, `Unexpected kind "${factorChild.kind}" of factor child`);
+						break;
 				}
 			}
 		}
