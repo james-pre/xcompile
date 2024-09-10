@@ -1,6 +1,6 @@
+number			= [ "0x" ], digit, {digit};
 identifier		= letter, { letter | digit };
 register		= "%", identifier;
-number			= [ "0x" ], digit, {digit};
 immediate		= "$", number;
 whitespace		= { " " | "\t" };
 line_terminator	= { "\n" | ";" };
@@ -12,4 +12,3 @@ operand_list = [whitespace], operand, {",", [whitespace], operand};
 instruction	= identifier, [operand_list];
 
 instruction_list = [whitespace], instruction, {line_terminator, [whitespace], instruction};
-
