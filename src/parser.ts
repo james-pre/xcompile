@@ -7,7 +7,7 @@ export interface DefinitionReference {
 
 export interface NodeDefinition {
 	name: string;
-	type: 'composite' | 'oneof' | 'literal';
+	type: 'composite' | 'oneof';
 	pattern: (string | DefinitionReference)[];
 }
 
