@@ -1,11 +1,11 @@
-register		= "%", letter, { letter | digit };
-immediate		= "$", [ "0x" ], digit, {digit};
-address			= [ "0x" ], digit, {digit};
 identifier		= letter, { letter | digit };
+register		= "%", identifier;
+number			= [ "0x" ], digit, {digit};
+immediate		= "$", number;
 whitespace		= { " " | "\t" };
 line_terminator	= { "\n" | ";" };
 
-operand = register | immediate | address;
+operand = register | immediate | number;
 
 operand_list = [whitespace], operand, {",", [whitespace], operand};
 
