@@ -28,7 +28,7 @@ export interface ParseOptionsShared {
 	debug?(message: string): void;
 }
 
-interface ParseTokenize extends ParseOptionsShared {
+interface ParseAndTokenize extends ParseOptionsShared {
 	source: string;
 	literals: Iterable<TokenDefinition>;
 }
@@ -38,7 +38,7 @@ interface ParseOnly extends ParseOptionsShared {
 	literals: string[];
 }
 
-export type ParseOptions = ParseOnly | ParseTokenize;
+export type ParseOptions = ParseOnly | ParseAndTokenize;
 
 export function parse({ definitions, rootNode, debug: _debug = () => {}, ...rest }: ParseOptions): Node[] {
 	let position = 0;

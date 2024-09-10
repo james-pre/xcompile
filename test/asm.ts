@@ -1,7 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 import { parse, stringifyNode } from '../src/parser';
-import { tokenize } from '../src/tokens';
 
 const {
 	positionals: [input],
@@ -11,7 +10,8 @@ const {
 });
 
 const ast = parse({
-	tokens: tokenize(readFileSync(input, 'utf8'), [
+	source: readFileSync(input, 'utf8'),
+	literals: [
 		{ name: 'register', pattern: /^%\w+/ },
 		{ name: 'immediate', pattern: /^\$(0x)?\d+/ },
 		{ name: 'address', pattern: /^(0x)?\d+/ },
@@ -19,8 +19,7 @@ const ast = parse({
 		{ name: 'whitespace', pattern: /^[ \t]+/ },
 		{ name: 'line_terminator', pattern: /^[\n;]+/ },
 		{ name: 'comma', pattern: /^,/ },
-	]),
-	literals: ['register', 'immediate', 'address', 'identifier', 'whitespace', 'line_terminator', 'comma'],
+	],
 	definitions: [
 		{ name: 'operand', type: 'oneof', pattern: ['register', 'immediate', 'address'] },
 		{
