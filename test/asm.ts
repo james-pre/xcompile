@@ -23,6 +23,7 @@ const ast = parse({
 		{ name: 'line_terminator', pattern: /^[\n;]+/ },
 		{ name: 'comma', pattern: /^,/ },
 	],
+	ignoreLiterals: [],
 	definitions: [
 		{ name: 'operand', type: 'oneof', pattern: ['register', 'immediate', 'address'] },
 		{
