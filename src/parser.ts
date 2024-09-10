@@ -18,7 +18,7 @@ export interface Node extends Token {
 export function stringifyNode(node: Node, depth = 0): string {
 	return (
 		`${node.kind}${node?.children?.length ? '' : ` "${node.text.replaceAll('\n', '\\n').replaceAll('\t', '\\t')}"`} ${node.line}:${node.column}` +
-		node?.children?.map((child) => '\n' + '    '.repeat(depth + 1) + stringifyNode(child, depth + 1))
+		(node?.children?.map((child) => '\n' + '    '.repeat(depth + 1) + stringifyNode(child, depth + 1)) || '')
 	);
 }
 
