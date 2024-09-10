@@ -50,8 +50,8 @@ export function parse(options: ParseOptions): Node[] {
 	const literals = 'tokens' in options ? options.literals : [...options.literals].map((literal) => literal.name);
 
 	function parseNode(kind: string, depth = 0): Node | null {
-		const debug = (message: string): unknown => (options.debug || (() => {}))('  '.repeat(depth) + message);
-		const verbose = (message: string): unknown => (options.verbose || (() => {}))('  '.repeat(depth + 1) + 'verbose: ' + message);
+		const debug = (message: string): void => options?.debug?.('  '.repeat(depth) + message);
+		const verbose = (message: string): void => options?.verbose?.('  '.repeat(depth + 1) + 'verbose: ' + message);
 		if (literals.includes(kind)) {
 			while (options.ignoreLiterals.includes(tokens[position]?.kind)) {
 				position++;
@@ -88,7 +88,7 @@ export function parse(options: ParseOptions): Node[] {
 				for (const option of pattern) {
 					const node = parseNode(option.kind, depth + 1);
 					if (node) {
-						return { ...node, kind: definition.name };
+						return node;
 					}
 				}
 				debug('Warning: No matches for oneof');

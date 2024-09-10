@@ -1,4 +1,4 @@
-import { type Node, type NodeDefinition, type DefinitionPart, parse } from './parser';
+import { type DefinitionPart, type Node, type NodeDefinition, parse } from './parser';
 import type { TokenDefinition } from './tokens';
 
 export function parseBnfAst(source: string, verbose: number = 0): Node[] {
@@ -80,7 +80,7 @@ export function parseBnfAst(source: string, verbose: number = 0): Node[] {
 
 export function convertAst(ast: Node, verbose: number = 0): { definitions: NodeDefinition[]; literals: TokenDefinition[] } {
 	function _log(level: number, depth: number, message: string) {
-		if (level >= verbose) {
+		if (level <= verbose) {
 			console.debug('  '.repeat(depth), message);
 		}
 	}
@@ -133,20 +133,22 @@ export function convertAst(ast: Node, verbose: number = 0): { definitions: NodeD
 			}
 
 			if (child.kind != 'term' && child.kind != 'term_continue') {
-				log(2, 'Expression child not term or term_continue');
+				log(2, 'Invalid expression child');
 				continue;
 			}
 
-			log(2, `Parsing factor: ${child.kind} "${child.text}" at ${child.line}:${child.column}`);
-			for (const factor of child.children || []) {
-				const factorChild = factor.children?.[0];
+			log(2, `Parsing term at ${child.line}:${child.column}`);
+			if (!child.children?.length) {
+				log(2, 'Term has no children');
+				continue;
+			}
+			for (const factor of child.children) {
+				const node = factor.children?.[0] ?? factor;
 
-				if (!factorChild) continue; // Skip if there's no factorChild
-
-				log(2, `Parsing factor child: ${factorChild.kind} "${factorChild.text}" at ${factorChild.line}:${factorChild.column}`);
-				switch (factorChild.kind) {
+				log(2, `Parsing ${node.kind} "${node.text}" at ${node.line}:${node.column}`);
+				switch (node.kind) {
 					case 'string': {
-						const literalText = factorChild.text.replace(/^"|"$/g, ''); // Strip quotes
+						const literalText = node.text.replace(/^"|"$/g, ''); // Strip quotes
 						literals.push({
 							name: literalText,
 							pattern: new RegExp(`^${literalText}`),
@@ -155,20 +157,26 @@ export function convertAst(ast: Node, verbose: number = 0): { definitions: NodeD
 						break;
 					}
 					case 'identifier':
-						pattern.push({ kind: factorChild.text, type: 'required' });
+						pattern.push({ kind: node.text, type: 'required' });
 						break;
 					case 'left_bracket':
 					case 'left_brace': {
-						const innerExpression = factor.children?.find((grandchild: Node) => grandchild.kind === 'expression');
-						if (innerExpression) {
-							const subPattern = processExpression(innerExpression, depth + 1);
-							const repeatType = factorChild.kind === 'left_bracket' ? 'optional' : 'repeated';
-							subPattern.forEach((sub) => pattern.push({ ...sub, type: repeatType }));
+						const inner = factor.children?.find(({ kind }) => kind == 'expression');
+						if (!inner) {
+							log(1, 'Missing inner expression');
+							break;
 						}
+
+						const subPattern = processExpression(inner, depth + 1);
+						const type = node.kind === 'left_bracket' ? 'optional' : 'repeated';
+						for (const sub of subPattern) {
+							pattern.push({ ...sub, type });
+						}
+
 						break;
 					}
 					default:
-						log(1, `Unexpected kind "${factorChild.kind}" of factor child`);
+						log(1, `Unexpected kind "${node.kind}" of factor child`);
 						break;
 				}
 			}

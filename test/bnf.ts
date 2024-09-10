@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { inspect, parseArgs } from 'node:util';
-import { parse, stringifyNode } from '../src/parser';
+import { stringifyNode } from '../src/parser';
 import { convertAst, parseBnfAst } from '../src/bnf';
 
 const {
@@ -9,6 +9,7 @@ const {
 } = parseArgs({
 	options: {
 		verbose: { type: 'boolean', short: 'v', multiple: true },
+		ast: { type: 'boolean', short: 'a' },
 	},
 	allowPositionals: true,
 });
@@ -17,13 +18,11 @@ const verbose = options.verbose?.filter(Boolean)?.length ?? 0;
 
 const ast = parseBnfAst(readFileSync(input, 'utf8'), verbose);
 
-if (verbose) {
-	console.log('AST:\n');
+if (options.ast) {
 	for (const node of ast) {
 		console.log(stringifyNode(node));
 	}
+	process.exit();
 }
 
-for (const node of ast) {
-	console.log(inspect(convertAst(node), { colors: true }));
-}
+console.log(inspect(convertAst(ast[0]), { colors: true }));
