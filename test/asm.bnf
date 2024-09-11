@@ -1,9 +1,9 @@
-number			= [ "0x" ], digit, {digit};
-identifier		= letter, { letter | digit };
+number			= [ "0x" ], "[0-9]+";
+identifier		= "[a-zA-Z][a-zA-Z0-9]*";
 register		= "%", identifier;
 immediate		= "$", number;
 whitespace		= "[ \t]+";
-line_terminator	= { "\n" | ";" };
+line_terminator	= "[\n;]+";
 
 operand = register | immediate | number;
 

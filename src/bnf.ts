@@ -111,8 +111,27 @@ export function convertAst(ast: Node, verbose: number = 0): { definitions: NodeD
 			return;
 		}
 
-		// Convert the expression node to a pattern
 		const pattern = processExpression(expression, depth + 1);
+
+		/*
+			Inline single-use literals
+			For example:
+			`ws = "[ \t]+";`
+			Gets converted to
+				"[ \\t]+": /[ \t]+/ (literal)
+				ws: [ { kind: "[ \\t]+", required: true } ] (definition)
+			This collapses it, so we have
+				ws: /[ \t]+/ (literal)
+		*/
+		const maybeLiteral = pattern[0].kind.replace(/^"|"$/g, '');
+		const index = literals.findIndex(({ name }) => name == maybeLiteral);
+		if (index != -1 && pattern.length == 1 && pattern[0].type == 'required') {
+			literals.splice(index, 1, {
+				name,
+				pattern: new RegExp('^' + maybeLiteral),
+			});
+			return;
+		}
 
 		// Add the NodeDefinition for this rule
 		definitions.push({
@@ -161,7 +180,7 @@ export function convertAst(ast: Node, verbose: number = 0): { definitions: NodeD
 				switch (node.kind) {
 					case 'string': {
 						const text = node.text.replace(/^"|"$/g, ''); // Strip quotes
-						literals.push({ name: text, pattern: new RegExp(`^${text}`) });
+						literals.push({ name: text, pattern: new RegExp('^' + text) });
 						pattern.push({ kind: text, type: 'required' });
 						break;
 					}
