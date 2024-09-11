@@ -88,7 +88,7 @@ export function convertAst(ast: Node, verbose: number = 0): { definitions: NodeD
 	const definitions: NodeDefinition[] = [];
 	const literals: TokenDefinition[] = [];
 
-	let inOneOf = false;
+	let isOneOf = false;
 
 	function processNode(node: Node, depth: number = 0) {
 		const log = (level: number, text: string) => _log(level, depth, text);
@@ -117,19 +117,19 @@ export function convertAst(ast: Node, verbose: number = 0): { definitions: NodeD
 		// Add the NodeDefinition for this rule
 		definitions.push({
 			name,
-			type: inOneOf ? 'oneof' : 'sequence',
+			type: isOneOf ? 'oneof' : 'sequence',
 			pattern: pattern.map((part) => (typeof part === 'string' ? { kind: part, type: 'required' } : part)),
 		});
 	}
 
 	function processExpression(expression: Node, depth: number = 0): DefinitionPart[] {
-		inOneOf = false;
+		isOneOf = false;
 		const log = (level: number, text: string) => _log(level, depth, text);
 		const pattern: DefinitionPart[] = [];
 
 		for (const term of expression.children || []) {
 			if (term.kind == 'pipe') {
-				inOneOf = true;
+				isOneOf = true;
 				log(2, 'Found pipe in expression (error/invalid?)');
 				continue;
 			}
@@ -137,7 +137,7 @@ export function convertAst(ast: Node, verbose: number = 0): { definitions: NodeD
 			if (term.kind == 'expression_continue') {
 				log(2, 'Found expression_continue');
 				pattern.push(...processExpression(term, depth + 1));
-				inOneOf = true;
+				isOneOf = true;
 				continue;
 			}
 
