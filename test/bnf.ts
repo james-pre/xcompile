@@ -16,7 +16,7 @@ const {
 
 const verbose = options.verbose?.filter(Boolean)?.length ?? 0;
 
-const ast = parseBnfAst(readFileSync(input, 'utf8'), verbose);
+const ast = parseBnfAst(readFileSync(input, 'utf8'), options.ast ? verbose : 0);
 
 if (options.ast) {
 	for (const node of ast) {
@@ -25,4 +25,4 @@ if (options.ast) {
 	process.exit();
 }
 
-console.log(inspect(convertAst(ast[0]), { colors: true }));
+console.log(inspect(convertAst(ast[0], verbose), { colors: true, depth: null }));

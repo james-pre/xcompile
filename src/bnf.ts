@@ -88,6 +88,8 @@ export function convertAst(ast: Node, verbose: number = 0): { definitions: NodeD
 	const definitions: NodeDefinition[] = [];
 	const literals: TokenDefinition[] = [];
 
+	let inOneOf = false;
+
 	function processNode(node: Node, depth: number = 0) {
 		const log = (level: number, text: string) => _log(level, depth, text);
 		log(3, `Processing ${node.kind} at ${node.line}:${node.column}`);
@@ -115,45 +117,52 @@ export function convertAst(ast: Node, verbose: number = 0): { definitions: NodeD
 		// Add the NodeDefinition for this rule
 		definitions.push({
 			name,
-			type: pattern.some((part) => part.kind === 'pipe') ? 'oneof' : 'sequence',
+			type: inOneOf ? 'oneof' : 'sequence',
 			pattern: pattern.map((part) => (typeof part === 'string' ? { kind: part, type: 'required' } : part)),
 		});
 	}
 
 	function processExpression(expression: Node, depth: number = 0): DefinitionPart[] {
+		inOneOf = false;
 		const log = (level: number, text: string) => _log(level, depth, text);
 		const pattern: DefinitionPart[] = [];
-		let inOneOf = false; // To track whether we're in an alternation (`|`)
 
-		for (const child of expression.children || []) {
-			if (child.kind == 'pipe') {
+		for (const term of expression.children || []) {
+			if (term.kind == 'pipe') {
 				inOneOf = true;
-				log(2, 'Found pipe in expression');
+				log(2, 'Found pipe in expression (error/invalid?)');
 				continue;
 			}
 
-			if (child.kind != 'term' && child.kind != 'term_continue') {
+			if (term.kind == 'expression_continue') {
+				log(2, 'Found expression_continue');
+				pattern.push(...processExpression(term, depth + 1));
+				inOneOf = true;
+				continue;
+			}
+
+			if (term.kind != 'term' && term.kind != 'term_continue') {
 				log(2, 'Invalid expression child');
 				continue;
 			}
 
-			log(2, `Parsing term at ${child.line}:${child.column}`);
-			if (!child.children?.length) {
+			log(2, `Parsing term at ${term.line}:${term.column}`);
+			if (!term.children?.length) {
 				log(2, 'Term has no children');
 				continue;
 			}
-			for (const factor of child.children) {
+			for (let factor of term.children) {
+				if (factor.kind == 'term_continue') {
+					factor = factor.children![1];
+				}
 				const node = factor.children?.[0] ?? factor;
 
 				log(2, `Parsing ${node.kind} "${node.text}" at ${node.line}:${node.column}`);
 				switch (node.kind) {
 					case 'string': {
-						const literalText = node.text.replace(/^"|"$/g, ''); // Strip quotes
-						literals.push({
-							name: literalText,
-							pattern: new RegExp(`^${literalText}`),
-						});
-						pattern.push({ kind: literalText, type: 'required' });
+						const text = node.text.replace(/^"|"$/g, ''); // Strip quotes
+						literals.push({ name: text, pattern: new RegExp(`^${text}`) });
+						pattern.push({ kind: text, type: 'required' });
 						break;
 					}
 					case 'identifier':
