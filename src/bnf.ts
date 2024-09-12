@@ -223,11 +223,7 @@ export function convertAst(ast: Node, verbose: number = 0): { definitions: NodeD
 							break;
 						}
 
-						// Increment the group counter
-						const groupCount = ++groups;
-
-						// Determine the new rule name based on whether it's the only group
-						const subName = groupCount === 1 ? `${currentNode}_${type}` : `${currentNode}_group_${groupCount}`;
+						const subName = `${currentNode}:group[${groups++}]`;
 
 						definitions.push({
 							name: subName,
