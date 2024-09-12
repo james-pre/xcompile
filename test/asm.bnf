@@ -4,15 +4,12 @@ register		= "%", identifier;
 immediate		= "$", number;
 whitespace		= "[ \t]+";
 line_terminator	= "[\n;]+";
+comment			= "#.*";
 
 operand = register | immediate | number;
 
-operand_list_continue = ",", operand;
-
-operand_list = operand, {operand_list_continue};
+operand_list = operand, {",", operand};
 
 instruction	= identifier, [operand_list];
 
-instruction_list_continue = line_terminator, instruction;
-
-instruction_list = instruction, {instruction_list_continue};
+instruction_list = (instruction | comment), {line_terminator, instruction};

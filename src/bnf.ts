@@ -11,10 +11,12 @@ export function parseBnfAst(source: string, verbose: number = 0): Node[] {
 			{ name: 'pipe', pattern: /^\|/ }, // Pipe (alternation)
 			{ name: 'comma', pattern: /^,/ }, // Comma (sequence separator)
 			{ name: 'semicolon', pattern: /^;/ }, // Semicolon (end of rule)
-			{ name: 'left_brace', pattern: /^\{/ }, // Left brace (repetition `{}`)
-			{ name: 'right_brace', pattern: /^\}/ }, // Right brace (repetition end)
-			{ name: 'left_bracket', pattern: /^\[/ }, // Left bracket (optional `[]`)
-			{ name: 'right_bracket', pattern: /^\]/ }, // Right bracket (optional end)
+			{ name: 'left_paren', pattern: /^\(/ }, // parenthesized start
+			{ name: 'right_paren', pattern: /^\)/ }, // parenthesized end
+			{ name: 'left_brace', pattern: /^\{/ }, // repetition start
+			{ name: 'right_brace', pattern: /^\}/ }, // repetition end
+			{ name: 'left_bracket', pattern: /^\[/ }, // optional start
+			{ name: 'right_bracket', pattern: /^\]/ }, // optional end
 			{ name: 'whitespace', pattern: /^[ \t]+/ }, // Whitespace
 			{ name: 'line_terminator', pattern: /^[\n;]+/ }, // Newlines or semicolons as line terminators
 		],
@@ -50,15 +52,18 @@ export function parseBnfAst(source: string, verbose: number = 0): Node[] {
 			{
 				name: 'group',
 				type: 'oneof',
-				pattern: ['repetition', 'optional'],
+				pattern: ['repetition', 'optional', 'parenthesized'],
 			},
-			// Repetition: { expression }
+			{
+				name: 'parenthesized',
+				type: 'sequence',
+				pattern: ['left_paren', 'expression', 'right_paren'],
+			},
 			{
 				name: 'repetition',
 				type: 'sequence',
 				pattern: ['left_brace', 'expression', 'right_brace'],
 			},
-			// Optional: [ expression ]
 			{
 				name: 'optional',
 				type: 'sequence',
@@ -78,6 +83,12 @@ export function parseBnfAst(source: string, verbose: number = 0): Node[] {
 	});
 }
 
+const typeForGroup = {
+	left_bracket: 'optional',
+	left_brace: 'repeated',
+	left_paren: 'required',
+} as const;
+
 export function convertAst(ast: Node, verbose: number = 0): { definitions: NodeDefinition[]; literals: TokenDefinition[] } {
 	function _log(level: number, depth: number, message: string) {
 		if (level <= verbose) {
@@ -88,7 +99,9 @@ export function convertAst(ast: Node, verbose: number = 0): { definitions: NodeD
 	const definitions: NodeDefinition[] = [];
 	const literals: TokenDefinition[] = [];
 
-	let isOneOf = false;
+	let isOneOf = false,
+		currentNode: string,
+		groups = 0;
 
 	function processNode(node: Node, depth: number = 0) {
 		const log = (level: number, text: string) => _log(level, depth, text);
@@ -110,6 +123,9 @@ export function convertAst(ast: Node, verbose: number = 0): { definitions: NodeD
 			log(1, 'Rule is missing name or expression');
 			return;
 		}
+
+		currentNode = name;
+		groups = 0;
 
 		const pattern = processExpression(expression, depth + 1);
 
@@ -188,18 +204,39 @@ export function convertAst(ast: Node, verbose: number = 0): { definitions: NodeD
 						pattern.push({ kind: node.text, type: 'required' });
 						break;
 					case 'left_bracket':
-					case 'left_brace': {
+					case 'left_brace':
+					case 'left_paren': {
 						const inner = factor.children?.find(({ kind }) => kind == 'expression');
 						if (!inner) {
 							log(1, 'Missing inner expression');
 							break;
 						}
 
+						const type = typeForGroup[node.kind];
+
 						const subPattern = processExpression(inner, depth + 1);
-						const type = node.kind === 'left_bracket' ? 'optional' : 'repeated';
-						for (const sub of subPattern) {
-							pattern.push({ ...sub, type });
+
+						// Check if subPattern contains another rule name, if so, no need to create a new group
+						const existing = subPattern.length == 1 && subPattern[0].kind !== 'string' ? subPattern[0].kind : null;
+						if (existing) {
+							pattern.push({ kind: existing, type });
+							break;
 						}
+
+						// Increment the group counter
+						const groupCount = ++groups;
+
+						// Determine the new rule name based on whether it's the only group
+						const subName = groupCount === 1 ? `${currentNode}_${type}` : `${currentNode}_group_${groupCount}`;
+
+						definitions.push({
+							name: subName,
+							type: 'sequence',
+							pattern: subPattern,
+						});
+
+						// Append the new rule name to the pattern, marked as optional or repeated
+						pattern.push({ kind: subName, type });
 
 						break;
 					}
