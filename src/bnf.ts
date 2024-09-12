@@ -1,87 +1,99 @@
-import { type DefinitionPart, type Node, type NodeDefinition, parse } from './parser';
-import type { TokenDefinition } from './tokens';
+import { type DefinitionPart, type Node, type NodeDefinition, parse, type ParseAndTokenize, type ParseOnly } from './parser';
+import { tokenize, type Token, type TokenDefinition } from './tokens';
 
-export function parseBnfAst(source: string, verbose: number = 0): Node[] {
-	return parse({
-		source,
-		literals: [
-			{ name: 'identifier', pattern: /^[a-zA-Z_]\w*/ }, // Matches rule names like `identifier`, `register`, etc.
-			{ name: 'string', pattern: /^"[^"]*"/ }, // Quoted literals like `"0x"`, `"%"`, etc.
-			{ name: 'equal', pattern: /^=/ }, // Equals sign (`=`)
-			{ name: 'pipe', pattern: /^\|/ }, // Pipe (alternation)
-			{ name: 'comma', pattern: /^,/ }, // Comma (sequence separator)
-			{ name: 'semicolon', pattern: /^;/ }, // Semicolon (end of rule)
-			{ name: 'left_paren', pattern: /^\(/ }, // parenthesized start
-			{ name: 'right_paren', pattern: /^\)/ }, // parenthesized end
-			{ name: 'left_brace', pattern: /^\{/ }, // repetition start
-			{ name: 'right_brace', pattern: /^\}/ }, // repetition end
-			{ name: 'left_bracket', pattern: /^\[/ }, // optional start
-			{ name: 'right_bracket', pattern: /^\]/ }, // optional end
-			{ name: 'whitespace', pattern: /^[ \t]+/ }, // Whitespace
-			{ name: 'line_terminator', pattern: /^[\n;]+/ }, // Newlines or semicolons as line terminators
-			{ name: 'comment', pattern: /^#[^\n]+/ },
-		],
+const literals = [
+	{ name: 'identifier', pattern: /^[a-zA-Z_]\w*/ }, // Matches rule names like `identifier`, `register`, etc.
+	{ name: 'string', pattern: /^"[^"]*"/ }, // Quoted literals like `"0x"`, `"%"`, etc.
+	{ name: 'equal', pattern: /^=/ }, // Equals sign (`=`)
+	{ name: 'pipe', pattern: /^\|/ }, // Pipe (alternation)
+	{ name: 'comma', pattern: /^,/ }, // Comma (sequence separator)
+	{ name: 'semicolon', pattern: /^;/ }, // Semicolon (end of rule)
+	{ name: 'left_paren', pattern: /^\(/ }, // parenthesized start
+	{ name: 'right_paren', pattern: /^\)/ }, // parenthesized end
+	{ name: 'left_brace', pattern: /^\{/ }, // repetition start
+	{ name: 'right_brace', pattern: /^\}/ }, // repetition end
+	{ name: 'left_bracket', pattern: /^\[/ }, // optional start
+	{ name: 'right_bracket', pattern: /^\]/ }, // optional end
+	{ name: 'whitespace', pattern: /^[ \t]+/ }, // Whitespace
+	{ name: 'line_terminator', pattern: /^[\n;]+/ }, // Newlines or semicolons as line terminators
+	{ name: 'comment', pattern: /^#[^\n]+/ },
+];
+
+export function tokenizeBnf(source: string): Token[] {
+	return tokenize(source, literals);
+}
+
+const definitions = [
+	// BNF Rule Definition: identifier = expression ;
+	{
+		name: 'rule',
+		type: 'sequence',
+		pattern: ['identifier', 'equal', 'expression', 'semicolon'],
+	},
+	// Expression: Sequence of terms separated by '|'
+	{ name: 'expression_continue', type: 'sequence', pattern: ['pipe', 'term'] },
+	{
+		name: 'expression',
+		type: 'sequence',
+		pattern: ['term', { kind: 'expression_continue', type: 'repeated' }],
+	},
+	// Term: Sequence of factors separated by commas
+	{ name: 'term_continue', type: 'sequence', pattern: ['comma', 'factor'] },
+	{
+		name: 'term',
+		type: 'sequence',
+		pattern: ['factor', { kind: 'term_continue', type: 'repeated' }],
+	},
+	// Factor: A factor is either a string, identifier, or a group (repetition, optional)
+	{
+		name: 'factor',
+		type: 'oneof',
+		pattern: ['string', 'identifier', 'group'],
+	},
+	// Group: {...} or [...] for repetition or optional
+	{
+		name: 'group',
+		type: 'oneof',
+		pattern: ['repetition', 'optional', 'parenthesized'],
+	},
+	{
+		name: 'parenthesized',
+		type: 'sequence',
+		pattern: ['left_paren', 'expression', 'right_paren'],
+	},
+	{
+		name: 'repetition',
+		type: 'sequence',
+		pattern: ['left_brace', 'expression', 'right_brace'],
+	},
+	{
+		name: 'optional',
+		type: 'sequence',
+		pattern: ['left_bracket', 'expression', 'right_bracket'],
+	},
+	// Rule list: Set of BNF rules separated by newlines or semicolons
+	{ name: 'rule_list_continue', type: 'sequence', pattern: [{ kind: 'rule', type: 'optional' }, 'line_terminator'] },
+	{
+		name: 'rule_list',
+		type: 'sequence',
+		pattern: ['rule', { kind: 'rule_list_continue', type: 'repeated' }],
+	},
+];
+
+export function parseBnf(sourceOrTokens: string | Iterable<Token>, verbose: number = 0): Node[] {
+	const shared = {
 		ignoreLiterals: ['whitespace', 'comment'],
-		definitions: [
-			// BNF Rule Definition: identifier = expression ;
-			{
-				name: 'rule',
-				type: 'sequence',
-				pattern: ['identifier', 'equal', 'expression', 'semicolon'],
-			},
-			// Expression: Sequence of terms separated by '|'
-			{ name: 'expression_continue', type: 'sequence', pattern: ['pipe', 'term'] },
-			{
-				name: 'expression',
-				type: 'sequence',
-				pattern: ['term', { kind: 'expression_continue', type: 'repeated' }],
-			},
-			// Term: Sequence of factors separated by commas
-			{ name: 'term_continue', type: 'sequence', pattern: ['comma', 'factor'] },
-			{
-				name: 'term',
-				type: 'sequence',
-				pattern: ['factor', { kind: 'term_continue', type: 'repeated' }],
-			},
-			// Factor: A factor is either a string, identifier, or a group (repetition, optional)
-			{
-				name: 'factor',
-				type: 'oneof',
-				pattern: ['string', 'identifier', 'group'],
-			},
-			// Group: {...} or [...] for repetition or optional
-			{
-				name: 'group',
-				type: 'oneof',
-				pattern: ['repetition', 'optional', 'parenthesized'],
-			},
-			{
-				name: 'parenthesized',
-				type: 'sequence',
-				pattern: ['left_paren', 'expression', 'right_paren'],
-			},
-			{
-				name: 'repetition',
-				type: 'sequence',
-				pattern: ['left_brace', 'expression', 'right_brace'],
-			},
-			{
-				name: 'optional',
-				type: 'sequence',
-				pattern: ['left_bracket', 'expression', 'right_bracket'],
-			},
-			// Rule list: Set of BNF rules separated by newlines or semicolons
-			{ name: 'rule_list_continue', type: 'sequence', pattern: [{ kind: 'rule', type: 'optional' }, 'line_terminator'] },
-			{
-				name: 'rule_list',
-				type: 'sequence',
-				pattern: ['rule', { kind: 'rule_list_continue', type: 'repeated' }],
-			},
-		],
+		definitions,
 		rootNode: 'rule_list',
 		debug: verbose > 1 ? console.debug : undefined,
 		verbose: verbose > 2 ? console.debug : undefined,
-	});
+	};
+
+	return parse(
+		typeof sourceOrTokens == 'string'
+			? <ParseAndTokenize>{ ...shared, source: sourceOrTokens, literals }
+			: <ParseOnly>{ ...shared, tokens: sourceOrTokens, literals: literals.map((t) => t.name) }
+	);
 }
 
 const typeForGroup = {

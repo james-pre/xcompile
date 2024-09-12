@@ -30,12 +30,12 @@ export interface ParseOptionsShared {
 	verbose?(message: string): void;
 }
 
-interface ParseAndTokenize extends ParseOptionsShared {
+export interface ParseAndTokenize extends ParseOptionsShared {
 	source: string;
 	literals: Iterable<TokenDefinition>;
 }
 
-interface ParseOnly extends ParseOptionsShared {
+export interface ParseOnly extends ParseOptionsShared {
 	tokens: Token[];
 	literals: string[];
 }
