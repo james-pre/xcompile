@@ -9,6 +9,8 @@ const {
 } = parseArgs({
 	options: {
 		verbose: { type: 'boolean', short: 'v', multiple: true },
+		colors: { type: 'boolean', short: 'c' },
+		format: { type: 'string', short: 'f', default: 'js' },
 		ast: { type: 'boolean', short: 'a' },
 	},
 	allowPositionals: true,
@@ -25,4 +27,8 @@ if (options.ast) {
 	process.exit();
 }
 
-console.log(inspect(convertAst(ast[0], verbose), { colors: true, depth: null }));
+const config = convertAst(ast[0], verbose);
+
+console.log(
+	options.format == 'json' ? JSON.stringify(config, (key, value) => (value instanceof RegExp ? value.source : value)) : inspect(config, { colors: options.colors, depth: null })
+);
