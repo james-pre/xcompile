@@ -19,8 +19,9 @@ export function parseBnfAst(source: string, verbose: number = 0): Node[] {
 			{ name: 'right_bracket', pattern: /^\]/ }, // optional end
 			{ name: 'whitespace', pattern: /^[ \t]+/ }, // Whitespace
 			{ name: 'line_terminator', pattern: /^[\n;]+/ }, // Newlines or semicolons as line terminators
+			{ name: 'comment', pattern: /^#[^\n]+/ },
 		],
-		ignoreLiterals: ['whitespace'],
+		ignoreLiterals: ['whitespace', 'comment'],
 		definitions: [
 			// BNF Rule Definition: identifier = expression ;
 			{
@@ -165,7 +166,7 @@ export function convertAst(ast: Node, verbose: number = 0): { definitions: NodeD
 		for (const term of expression.children || []) {
 			if (term.kind == 'pipe') {
 				isOneOf = true;
-				log(2, 'Found pipe in expression (error/invalid?)');
+				log(2, 'Found pipe in expression');
 				continue;
 			}
 
@@ -227,7 +228,7 @@ export function convertAst(ast: Node, verbose: number = 0): { definitions: NodeD
 
 						definitions.push({
 							name: subName,
-							type: 'sequence',
+							type: isOneOf ? 'oneof' : 'sequence',
 							pattern: subPattern,
 						});
 
