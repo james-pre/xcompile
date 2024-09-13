@@ -39,5 +39,7 @@ if (options.stage == 'ast') {
 const config = convertBnf(ast[0], verbose);
 
 console.log(
-	options.format == 'json' ? JSON.stringify(config, (key, value) => (value instanceof RegExp ? value.source : value)) : inspect(config, { colors: options.colors, depth: null })
+	options.format == 'json'
+		? JSON.stringify(config, (key, value) => (value instanceof RegExp ? value.source.slice(1) : value))
+		: inspect(config, { colors: options.colors, depth: null })
 );
