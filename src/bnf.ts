@@ -1,4 +1,5 @@
-import { type DefinitionPart, type Node, type NodeDefinition, parse, type ParseAndTokenize, type ParseOnly } from './parser';
+import type { DefinitionPart, Node, NodeDefinition, ParseAndTokenize, ParseOnly } from './parser';
+import { parse } from './parser';
 import { tokenize, type Token, type TokenDefinition } from './tokens';
 
 const literals = [
@@ -31,14 +32,22 @@ const definitions = [
 		pattern: ['identifier', 'equal', 'expression', 'semicolon'],
 	},
 	// Expression: Sequence of terms separated by '|'
-	{ name: 'expression_continue', type: 'sequence', pattern: ['pipe', 'term'] },
+	{
+		name: 'expression_continue',
+		type: 'sequence',
+		pattern: ['pipe', 'term'],
+	},
 	{
 		name: 'expression',
 		type: 'sequence',
 		pattern: ['term', { kind: 'expression_continue', type: 'repeated' }],
 	},
 	// Term: Sequence of factors separated by commas
-	{ name: 'term_continue', type: 'sequence', pattern: ['comma', 'factor'] },
+	{
+		name: 'term_continue',
+		type: 'sequence',
+		pattern: ['comma', 'factor'],
+	},
 	{
 		name: 'term',
 		type: 'sequence',
@@ -72,11 +81,18 @@ const definitions = [
 		pattern: ['left_bracket', 'expression', 'right_bracket'],
 	},
 	// Rule list: Set of BNF rules separated by newlines or semicolons
-	{ name: 'rule_list_continue', type: 'sequence', pattern: [{ kind: 'rule', type: 'optional' }, 'line_terminator'] },
+	{
+		name: 'rule_list_continue',
+		type: 'sequence',
+		pattern: [{ kind: 'rule', type: 'optional' }, 'line_terminator'],
+	},
 	{
 		name: 'rule_list',
 		type: 'sequence',
-		pattern: ['rule', { kind: 'rule_list_continue', type: 'repeated' }],
+		pattern: [
+			{ kind: 'rule', type: 'optional' },
+			{ kind: 'rule_list_continue', type: 'repeated' },
+		],
 	},
 ];
 
@@ -102,7 +118,7 @@ const typeForGroup = {
 	left_paren: 'required',
 } as const;
 
-export function convertAst(ast: Node, verbose: number = 0): { definitions: NodeDefinition[]; literals: TokenDefinition[] } {
+export function convertBnf(ast: Node, verbose: number = 0): { definitions: NodeDefinition[]; literals: TokenDefinition[] } {
 	function _log(level: number, depth: number, message: string) {
 		if (level <= verbose) {
 			console.debug('  '.repeat(depth), message);
