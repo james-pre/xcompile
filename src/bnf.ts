@@ -1,6 +1,6 @@
-import type { DefinitionPart, Node, NodeDefinition, ParseAndTokenize, ParseOnly } from './parser';
-import { parse } from './parser';
-import { tokenize, type Token, type TokenDefinition } from './tokens';
+import type { DefinitionPart, Node, NodeDefinition, ParseAndTokenize, ParseOnly } from './parser.js';
+import { parse } from './parser.js';
+import { tokenize, type Token, type TokenDefinition } from './tokens.js';
 
 const literals = [
 	{ name: 'identifier', pattern: /^[a-zA-Z_]\w*/ }, // Matches rule names like `identifier`, `register`, etc.

@@ -1,4 +1,4 @@
-import { tokenize, type Token, type TokenDefinition } from './tokens';
+import { tokenize, type Token, type TokenDefinition } from './tokens.js';
 
 export interface DefinitionPart {
 	kind: string;
