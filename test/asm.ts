@@ -47,8 +47,6 @@ let definitions = [
 	{ name: 'instruction_list', type: 'sequence', pattern: ['instruction', { kind: 'whitespace', type: 'optional' }, { kind: 'instruction_list_continue', type: 'repeated' }] },
 ] satisfies NodeDefinition[];
 
-writeFileSync('tmp/asm.js.json', JSON.stringify({ literals: literals.map(l => ({ name: l.name, pattern: l.pattern.source.slice(1) })), definitions }));
-
 try {
 	if (options.json) {
 		const json = JSON.parse(readFileSync(options.json, 'utf-8'));
