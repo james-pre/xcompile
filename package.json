@@ -7,7 +7,7 @@
 	"types": "dist/index.d.ts",
 	"keywords": [],
 	"bin": {
-		"build": "scripts/build.js"
+		"xcompile-bnf": "scripts/bnf.js"
 	},
 	"files": [
 		"dist",
@@ -15,7 +15,7 @@
 	],
 	"type": "module",
 	"homepage": "https://github.com/james-pre/xcompile",
-	"license": "MIT",
+	"license": "GPL-3.0-or-later",
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/james-pre/xcompile.git"
@@ -34,12 +34,12 @@
 		"format": "prettier --write .",
 		"format:check": "prettier --check .",
 		"lint": "tsc -p tsconfig.json --noEmit && eslint src",
-		"build": "tsc -p tsconfig.json && cp src/*.d.ts dist",
+		"build": "tsc -p tsconfig.json",
 		"build:docs": "typedoc",
 		"prepublishOnly": "npm run build"
 	},
 	"dependencies": {
-		"@types/node": "^22.5.4"
+		"@types/node": "^22.10.2"
 	},
 	"devDependencies": {
 		"@eslint/js": "^9.17.0",

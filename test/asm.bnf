@@ -1,9 +1,9 @@
 # AT & T assembly
 
-number			= [ "0x" ], "[0-9]+";
-identifier		= "[a-zA-Z][a-zA-Z0-9]*";
-register		= "%", identifier;
-immediate		= "$", number;
+number			= "(0x)?\d+";
+identifier		= "\w+";
+register		= "%\w+";
+immediate		= "\$(0x)?\d+";
 whitespace		= "[ \t]+";
 line_terminator	= "[\n;]+";
 comment			= "#.*";

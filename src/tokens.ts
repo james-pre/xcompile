@@ -29,7 +29,7 @@ export function tokenize(source: string, definitions: Iterable<TokenDefinition>)
 		}
 
 		if (!token) {
-			throw new Error(`Unexpected token "${source[position - 1]}" at line ${line}, column ${column}`);
+			throw new Error(`Unexpected token "${source[position]}" at line ${line}, column ${column}`);
 		}
 
 		tokens.push(token);

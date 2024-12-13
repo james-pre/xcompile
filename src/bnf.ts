@@ -1,8 +1,9 @@
-import type { DefinitionPart, Node, NodeDefinition, ParseAndTokenize, ParseOnly } from './parser.js';
+import type { DefinitionPart, Node, NodeDefinition } from './parser.js';
 import { parse } from './parser.js';
-import { tokenize, type Token, type TokenDefinition } from './tokens.js';
+import type { Token, TokenDefinition } from './tokens.js';
+import { tokenize } from './tokens.js';
 
-const literals = [
+export const literals = [
 	{ name: 'identifier', pattern: /^[a-zA-Z_]\w*/ }, // Matches rule names like `identifier`, `register`, etc.
 	{ name: 'string', pattern: /^"[^"]*"/ }, // Quoted literals like `"0x"`, `"%"`, etc.
 	{ name: 'equal', pattern: /^=/ }, // Equals sign (`=`)
@@ -20,11 +21,16 @@ const literals = [
 	{ name: 'comment', pattern: /^#[^\n]+/ },
 ];
 
-export function tokenizeBnf(source: string): Token[] {
+/**
+ * Shortcut for tokenize(source, bnf.literals);
+ */
+function tokenizeBnf(source: string): Token[] {
 	return tokenize(source, literals);
 }
 
-const definitions = [
+export { tokenizeBnf as tokenize };
+
+export const definitions = [
 	// BNF Rule Definition: identifier = expression ;
 	{
 		name: 'rule',
@@ -94,23 +100,33 @@ const definitions = [
 			{ kind: 'rule_list_continue', type: 'repeated' },
 		],
 	},
-];
+] as const satisfies NodeDefinition[];
 
-export function parseBnf(sourceOrTokens: string | Iterable<Token>, verbose: number = 0): Node[] {
-	const shared = {
+export function parseSource(source: string, verbose: number = 0): Node[] {
+	return parse({
 		ignoreLiterals: ['whitespace', 'comment'],
 		definitions,
 		rootNode: 'rule_list',
 		debug: verbose > 1 ? console.debug : undefined,
 		verbose: verbose > 2 ? console.debug : undefined,
-	};
-
-	return parse(
-		typeof sourceOrTokens == 'string'
-			? <ParseAndTokenize>{ ...shared, source: sourceOrTokens, literals }
-			: <ParseOnly>{ ...shared, tokens: sourceOrTokens, literals: literals.map(t => t.name) }
-	);
+		source,
+		literals,
+	});
 }
+
+function parseBnf(tokens: Token[], verbose: number = 0): Node[] {
+	return parse({
+		ignoreLiterals: ['whitespace', 'comment'],
+		definitions,
+		rootNode: 'rule_list',
+		debug: verbose > 1 ? console.debug : undefined,
+		verbose: verbose > 2 ? console.debug : undefined,
+		tokens,
+		literals: literals.map(t => t.name),
+	});
+}
+
+export { parseBnf as parse };
 
 const typeForGroup = {
 	left_bracket: 'optional',
@@ -118,7 +134,7 @@ const typeForGroup = {
 	left_paren: 'required',
 } as const;
 
-export function convertBnf(ast: Node, verbose: number = 0): { definitions: NodeDefinition[]; literals: TokenDefinition[] } {
+export function convert(ast: Node, verbose: number = 0): { definitions: NodeDefinition[]; literals: TokenDefinition[] } {
 	function _log(level: number, depth: number, message: string) {
 		if (level <= verbose) {
 			console.debug('  '.repeat(depth), message);
@@ -163,10 +179,10 @@ export function convertBnf(ast: Node, verbose: number = 0): { definitions: NodeD
 			For example:
 			`ws = "[ \t]+";`
 			Gets converted to
-				"[ \\t]+": /[ \t]+/ (literal)
-				ws: [ { kind: "[ \\t]+", required: true } ] (definition)
+				"[ \\t]+": /[ \t]+/ (a literal)
+				ws: [ { kind: "[ \\t]+", required: true } ] (a definition)
 			This collapses it, so we have
-				ws: /[ \t]+/ (literal)
+				ws: /[ \t]+/ (a literal)
 		*/
 		const maybeLiteral = pattern[0].kind.replace(/^"|"$/g, '');
 		const index = literals.findIndex(({ name }) => name == maybeLiteral);
@@ -252,7 +268,7 @@ export function convertBnf(ast: Node, verbose: number = 0): { definitions: NodeD
 							break;
 						}
 
-						const subName = `${currentNode}:group[${groups++}]`;
+						const subName = `${currentNode}#${groups++}`;
 
 						definitions.push({
 							name: subName,
