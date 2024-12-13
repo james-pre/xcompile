@@ -108,7 +108,7 @@ export function parseBnf(sourceOrTokens: string | Iterable<Token>, verbose: numb
 	return parse(
 		typeof sourceOrTokens == 'string'
 			? <ParseAndTokenize>{ ...shared, source: sourceOrTokens, literals }
-			: <ParseOnly>{ ...shared, tokens: sourceOrTokens, literals: literals.map((t) => t.name) }
+			: <ParseOnly>{ ...shared, tokens: sourceOrTokens, literals: literals.map(t => t.name) }
 	);
 }
 
@@ -144,8 +144,8 @@ export function convertBnf(ast: Node, verbose: number = 0): { definitions: NodeD
 		}
 
 		// Extract the rule name (identifier) and its expression
-		const name = node.children?.find((child) => child.kind === 'identifier')?.text;
-		const expression = node.children?.find((child) => child.kind === 'expression');
+		const name = node.children?.find(child => child.kind === 'identifier')?.text;
+		const expression = node.children?.find(child => child.kind === 'expression');
 
 		log(2, `Found rule "${name}" at ${node.line}:${node.column}`);
 		if (!name || !expression) {
@@ -182,7 +182,7 @@ export function convertBnf(ast: Node, verbose: number = 0): { definitions: NodeD
 		definitions.push({
 			name,
 			type: isOneOf ? 'oneof' : 'sequence',
-			pattern: pattern.map((part) => (typeof part === 'string' ? { kind: part, type: 'required' } : part)),
+			pattern: pattern.map(part => (typeof part === 'string' ? { kind: part, type: 'required' } : part)),
 		});
 	}
 

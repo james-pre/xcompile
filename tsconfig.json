@@ -9,5 +9,10 @@
 		"strict": true
 	},
 	"include": ["src/**/*.ts", "scripts/**/*.ts"],
-	"exclude": ["node_modules"]
+	"exclude": ["node_modules"],
+	"typedocOptions": {
+		"entryPoints": ["./src/index.ts"],
+		"out": "docs",
+		"name": "XCompile"
+	}
 }

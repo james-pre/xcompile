@@ -18,7 +18,7 @@ export interface Node extends Token {
 export function stringifyNode(node: Node, depth = 0): string {
 	return (
 		`${node.kind}${node?.children?.length ? '' : ` "${node.text.replaceAll('\n', '\\n').replaceAll('\t', '\\t')}"`} ${node.line}:${node.column}` +
-		(node?.children?.map((child) => '\n' + '    '.repeat(depth + 1) + stringifyNode(child, depth + 1)).join('') || '')
+		(node?.children?.map(child => '\n' + '    '.repeat(depth + 1) + stringifyNode(child, depth + 1)).join('') || '')
 	);
 }
 
@@ -47,7 +47,7 @@ export function parse(options: ParseOptions): Node[] {
 		dirtyPosition = 0;
 
 	const tokens = 'tokens' in options ? options.tokens : tokenize(options.source, options.literals);
-	const literals = 'tokens' in options ? options.literals : [...options.literals].map((literal) => literal.name);
+	const literals = 'tokens' in options ? options.literals : [...options.literals].map(literal => literal.name);
 
 	function parseNode(kind: string, depth = 0): Node | null {
 		const debug = (message: string): void => options?.debug?.('  '.repeat(depth) + message);
@@ -74,13 +74,13 @@ export function parse(options: ParseOptions): Node[] {
 			return { ...token, children: [] };
 		}
 
-		const definition = options.definitions.find((def) => def.name === kind);
+		const definition = options.definitions.find(def => def.name === kind);
 		if (!definition) {
 			debug(`Error: Definition for node "${kind}" not found`);
 			throw new Error(`Definition for node "${kind}" not found`);
 		}
 
-		const pattern = definition.pattern.map((part) => (typeof part === 'string' ? { kind: part, type: 'required' } : part));
+		const pattern = definition.pattern.map(part => (typeof part === 'string' ? { kind: part, type: 'required' } : part));
 
 		switch (definition.type) {
 			case 'oneof': {
