@@ -1,22 +1,34 @@
 
-string          = '("(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\')';
+string          = '"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'';
 identifier      = '[a-zA-Z_]\w*';
 whitespace      = '[ \t]+';
 line_terminator	= "[\n;]+";
-comment         = "#[^\\n]*";
-directive       = "##\w+ .*";
+comment         = "#[^\n]*";
+directive       = "##\w+ [^\n]*";
+
+# Simplifies internals
+
+pipe = '\|';
+left_param = '\(';
+right_param = '\)';
+left_bracket = '\[';
+right_bracket = '\]';
+left_brace = '\{';
+right_brace = '\}';
 
 ##ignore whitespace comment
 
-parenthesized = '\(', expression, '\)';
-optional = '\[', expression, '\]';
-repetition = '\{', expression, '\}';
+parenthesized = left_param, expression, right_param;
+optional = left_bracket, expression, right_bracket;
+repetition = left_brace, expression, right_brace;
 
 group = parenthesized | optional | repetition;
 
-term = string | identifier | group;
+factor = string | identifier | group;
 
-expression = term, {('\|' | ','), term};
+term = factor, {pipe, factor};
+
+expression = term, {',', term};
 
 rule = identifier, '=', expression, ';';
 

@@ -1,7 +1,7 @@
 {
 	"literals": [
 		{ "name": "identifier", "pattern": "[a-zA-Z_]\\w*" },
-		{ "name": "string", "pattern": "(\"(?:\\\\.|[^\"\\\\])*\"|'(?:\\\\.|[^'\\\\])*')" },
+		{ "name": "string", "pattern": "\"(?:\\\\.|[^\"\\\\])*\"|'(?:\\\\.|[^'\\\\])*'" },
 		{ "name": "equal", "pattern": "=" },
 		{ "name": "pipe", "pattern": "\\|" },
 		{ "name": "comma", "pattern": "," },

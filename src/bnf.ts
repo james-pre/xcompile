@@ -97,7 +97,8 @@ export function ast_to_config(ast: Node[], log: Logger = () => {}): config.Confi
 			This collapses it, so we have
 				ws: /[ \t]+/ (a literal)
 		*/
-		const maybeLiteral = pattern[0].kind.replace(/^"|"$/g, '');
+
+		const maybeLiteral = pattern[0].kind;
 		const index = literals.findIndex(({ name }) => name == maybeLiteral);
 		if (index != -1 && pattern.length == 1 && pattern[0].type == 'required') {
 			literals.splice(index, 1, {
@@ -127,14 +128,14 @@ export function ast_to_config(ast: Node[], log: Logger = () => {}): config.Confi
 				continue;
 			}
 
-			if (term.kind == 'expression_continue') {
+			if (term.kind == 'expression_continue' || term.kind == 'expression#0') {
 				_log(2, 'Found expression_continue');
 				pattern.push(...processExpression(term, depth + 1));
 				isOneOf = true;
 				continue;
 			}
 
-			if (term.kind != 'term' && term.kind != 'term_continue') {
+			if (term.kind != 'term' && term.kind != 'term_continue' && term.kind != 'term#0') {
 				_log(2, 'Invalid expression child');
 				continue;
 			}
@@ -145,7 +146,7 @@ export function ast_to_config(ast: Node[], log: Logger = () => {}): config.Confi
 				continue;
 			}
 			for (let factor of term.children) {
-				if (factor.kind == 'term_continue') {
+				if (factor.kind == 'term_continue' || factor.kind == 'term#0') {
 					factor = factor.children![1];
 				}
 				const node = factor.children?.[0] ?? factor;
@@ -153,7 +154,11 @@ export function ast_to_config(ast: Node[], log: Logger = () => {}): config.Confi
 				_log(2, `Parsing ${node.kind} "${node.text}" at ${node.line}:${node.column}`);
 				switch (node.kind) {
 					case 'string': {
-						const text = node.text.replace(/^"|"$/g, ''); // Strip quotes
+						const quote = node.text.charAt(0); // either ' or "
+
+						// Remove the surrounding quotes
+						const text = node.text.slice(1, -1).replaceAll('\\' + quote, quote);
+
 						literals.push({ name: text, pattern: new RegExp('^' + text) });
 						pattern.push({ kind: text, type: 'required' });
 						break;
