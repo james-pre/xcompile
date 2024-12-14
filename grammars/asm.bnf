@@ -10,7 +10,8 @@ comment         = "#.*";
 
 ##ignore whitespace line_terminator comment
 
-operand = register | immediate | number;
+operand = register
+| immediate | number;
 
 operand_list = operand, {",", operand};
 

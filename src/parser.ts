@@ -147,6 +147,7 @@ export function parse(options: ParseOptions): Node[] {
 	while (position < tokens.length) {
 		const node = parseNode(options.rootNode);
 		if (!node) {
+			if (position >= tokens.length && options.ignoreLiterals.includes(tokens.at(-1)!.kind)) break;
 			const token = tokens[dirtyPosition || position];
 			throw new Error(`Unexpected token "${token.text}" at line ${token.line}, column ${token.column}`);
 		}

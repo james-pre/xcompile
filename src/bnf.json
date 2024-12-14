@@ -92,7 +92,6 @@
 			"type": "oneof",
 			"pattern": [
 				{ "kind": "rule", "type": "required" },
-				{ "kind": "comment", "type": "required" },
 				{ "kind": "directive", "type": "required" }
 			]
 		},
@@ -100,9 +99,7 @@
 			"name": "rule_list#1",
 			"type": "oneof",
 			"pattern": [
-				{ "kind": "line_terminator", "type": "required" },
 				{ "kind": "rule", "type": "required" },
-				{ "kind": "comment", "type": "required" },
 				{ "kind": "directive", "type": "required" }
 			]
 		},
@@ -116,11 +113,11 @@
 		}
 	],
 	"literals": [
-		{ "name": "string", "pattern": "\"(?:\\\\.|[^\"\\\\])*\"|'(?:\\\\.|[^'\\\\])*'" },
+		{ "name": "string", "pattern": "(\"(?:\\\\.|[^\"\\\\])*\"|'(?:\\\\.|[^'\\\\])*')" },
 		{ "name": "identifier", "pattern": "[a-zA-Z_]\\w*" },
 		{ "name": "whitespace", "pattern": "[ \\t]+" },
-		{ "name": "line_terminator", "pattern": "[\\n;]+" },
-		{ "name": "comment", "pattern": "#[^\\n]*" },
+		{ "name": "line_terminator", "pattern": "\\n+" },
+		{ "name": "comment", "pattern": "#(?!#)([^\\n]*)" },
 		{ "name": "directive", "pattern": "##\\w+ [^\\n]*" },
 		{ "name": "pipe", "pattern": "\\|" },
 		{ "name": "left_param", "pattern": "\\(" },
@@ -134,5 +131,5 @@
 		{ "name": ";", "pattern": ";" }
 	],
 	"rootNode": "rule_list",
-	"ignoreLiterals": ["whitespace", "comment"]
+	"ignoreLiterals": ["whitespace", "comment", "line_terminator"]
 }

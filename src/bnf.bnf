@@ -1,9 +1,9 @@
 
-string          = '"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'';
+string          = '("(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\')';
 identifier      = '[a-zA-Z_]\w*';
 whitespace      = '[ \t]+';
-line_terminator	= "[\n;]+";
-comment         = "#[^\n]*";
+line_terminator	= "\n+";
+comment         = "#(?!#)([^\n]*)";
 directive       = "##\w+ [^\n]*";
 
 # Simplifies internals
@@ -16,7 +16,7 @@ right_bracket = '\]';
 left_brace = '\{';
 right_brace = '\}';
 
-##ignore whitespace comment
+##ignore whitespace comment line_terminator
 
 parenthesized = left_param, expression, right_param;
 optional = left_bracket, expression, right_bracket;
@@ -32,6 +32,6 @@ expression = term, {',', term};
 
 rule = identifier, '=', expression, ';';
 
-rule_list = (rule | comment | directive), {line_terminator, rule | comment | directive};
+rule_list = (rule | directive), {rule | directive};
 
 ##root rule_list
