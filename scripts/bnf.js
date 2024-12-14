@@ -71,7 +71,7 @@ if (options.tokens) {
 	if (options.tokens == 'only') process.exit(0);
 }
 
-const ast = bnf.parse(tokens, logger(options.ast ? parseInt(options.ast) : 0));
+const ast = bnf.parse(tokens, logger(options.parser ? parseInt(options.parser) : 0));
 
 if (options.ast) {
 	for (const node of ast) {
