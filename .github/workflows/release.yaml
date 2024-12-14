@@ -9,7 +9,7 @@ on:
 jobs:
     ci:
         name: CI Checks
-        uses: ./.github/workflows/ci-single-platform.yaml
+        uses: ./.github/workflows/ci.yaml
         with:
             platform: ubuntu-latest
     release:
@@ -19,10 +19,10 @@ jobs:
             - name: Checkout
               uses: actions/checkout@v4
 
-            - name: Setup npm authenication
+            - name: Setup npm authentication
               uses: actions/setup-node@v4
               with:
-                  node-version: 22.5.1
+                  node-version: 22
                   registry-url: https://registry.npmjs.org/
 
             - name: Install dependencies
