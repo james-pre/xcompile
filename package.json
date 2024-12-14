@@ -1,6 +1,6 @@
 {
 	"name": "xcompile",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"author": "James Prevett <jp@jamespre.dev> (https://jamespre.dev)",
 	"description": "A robust tokenizer, parser, and transpiler",
 	"main": "dist/index.js",
