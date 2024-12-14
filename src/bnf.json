@@ -1,0 +1,138 @@
+{
+	"definitions": [
+		{
+			"name": "parenthesized",
+			"type": "sequence",
+			"pattern": [
+				{ "kind": "left_param", "type": "required" },
+				{ "kind": "expression", "type": "required" },
+				{ "kind": "right_param", "type": "required" }
+			]
+		},
+		{
+			"name": "optional",
+			"type": "sequence",
+			"pattern": [
+				{ "kind": "left_bracket", "type": "required" },
+				{ "kind": "expression", "type": "required" },
+				{ "kind": "right_bracket", "type": "required" }
+			]
+		},
+		{
+			"name": "repetition",
+			"type": "sequence",
+			"pattern": [
+				{ "kind": "left_brace", "type": "required" },
+				{ "kind": "expression", "type": "required" },
+				{ "kind": "right_brace", "type": "required" }
+			]
+		},
+		{
+			"name": "group",
+			"type": "oneof",
+			"pattern": [
+				{ "kind": "parenthesized", "type": "required" },
+				{ "kind": "optional", "type": "required" },
+				{ "kind": "repetition", "type": "required" }
+			]
+		},
+		{
+			"name": "factor",
+			"type": "oneof",
+			"pattern": [
+				{ "kind": "string", "type": "required" },
+				{ "kind": "identifier", "type": "required" },
+				{ "kind": "group", "type": "required" }
+			]
+		},
+		{
+			"name": "term#0",
+			"type": "sequence",
+			"pattern": [
+				{ "kind": "pipe", "type": "required" },
+				{ "kind": "factor", "type": "required" }
+			]
+		},
+		{
+			"name": "term",
+			"type": "sequence",
+			"pattern": [
+				{ "kind": "factor", "type": "required" },
+				{ "kind": "term#0", "type": "repeated" }
+			]
+		},
+		{
+			"name": "expression#0",
+			"type": "sequence",
+			"pattern": [
+				{ "kind": ",", "type": "required" },
+				{ "kind": "term", "type": "required" }
+			]
+		},
+		{
+			"name": "expression",
+			"type": "sequence",
+			"pattern": [
+				{ "kind": "term", "type": "required" },
+				{ "kind": "expression#0", "type": "repeated" }
+			]
+		},
+		{
+			"name": "rule",
+			"type": "sequence",
+			"pattern": [
+				{ "kind": "identifier", "type": "required" },
+				{ "kind": "=", "type": "required" },
+				{ "kind": "expression", "type": "required" },
+				{ "kind": ";", "type": "required" }
+			]
+		},
+		{
+			"name": "rule_list#0",
+			"type": "oneof",
+			"pattern": [
+				{ "kind": "rule", "type": "required" },
+				{ "kind": "comment", "type": "required" },
+				{ "kind": "directive", "type": "required" }
+			]
+		},
+		{
+			"name": "rule_list#1",
+			"type": "oneof",
+			"pattern": [
+				{ "kind": "line_terminator", "type": "required" },
+				{ "kind": "rule", "type": "required" },
+				{ "kind": "comment", "type": "required" },
+				{ "kind": "directive", "type": "required" }
+			]
+		},
+		{
+			"name": "rule_list",
+			"type": "oneof",
+			"pattern": [
+				{ "kind": "rule_list#0", "type": "required" },
+				{ "kind": "rule_list#1", "type": "repeated" }
+			]
+		}
+	],
+	"literals": [
+		{ "name": "string", "pattern": "\"(?:\\\\.|[^\"\\\\])*\"|'(?:\\\\.|[^'\\\\])*'" },
+		{ "name": "identifier", "pattern": "[a-zA-Z_]\\w*" },
+		{ "name": "whitespace", "pattern": "[ \\t]+" },
+		{ "name": "line_terminator", "pattern": "[\\n;]+" },
+		{ "name": "comment", "pattern": "#[^\\n]*" },
+		{ "name": "directive", "pattern": "##\\w+ [^\\n]*" },
+		{ "name": "pipe", "pattern": "\\|" },
+		{ "name": "left_param", "pattern": "\\(" },
+		{ "name": "right_param", "pattern": "\\)" },
+		{ "name": "left_bracket", "pattern": "\\[" },
+		{ "name": "right_bracket", "pattern": "\\]" },
+		{ "name": "left_brace", "pattern": "\\{" },
+		{ "name": "right_brace", "pattern": "\\}" },
+		{ "name": ",", "pattern": "," },
+		{ "name": "=", "pattern": "=" },
+		{ "name": ";", "pattern": ";" }
+	],
+	"rootNode": "rule_list",
+	"ignoreLiterals": ["whitespace", "comment"]
+}
