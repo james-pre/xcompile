@@ -9,8 +9,8 @@ directive       = "##\w+ [^\n]*";
 # Simplifies internals
 
 pipe = '\|';
-left_param = '\(';
-right_param = '\)';
+left_paren = '\(';
+right_paren = '\)';
 left_bracket = '\[';
 right_bracket = '\]';
 left_brace = '\{';
@@ -18,7 +18,7 @@ right_brace = '\}';
 
 ##ignore whitespace comment line_terminator
 
-parenthesized = left_param, expression, right_param;
+parenthesized = left_paren, expression, right_paren;
 optional = left_bracket, expression, right_bracket;
 repetition = left_brace, expression, right_brace;
 
@@ -26,9 +26,9 @@ group = parenthesized | optional | repetition;
 
 factor = string | identifier | group;
 
-term = factor, {pipe, factor};
+term = factor, {',', factor};
 
-expression = term, {',', term};
+expression = term, {pipe, term};
 
 rule = identifier, '=', expression, ';';
 

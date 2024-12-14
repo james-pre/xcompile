@@ -1,9 +1,9 @@
+import rawConfig from './bnf.json' with { type: 'json' };
+import * as config from './config.js';
 import type { DefinitionPart, Logger, Node, NodeDefinition } from './parser.js';
 import { parse } from './parser.js';
 import type { Token, TokenDefinition } from './tokens.js';
 import { tokenize } from './tokens.js';
-import rawConfig from './bnf.json' with { type: 'json' };
-import * as config from './config.js';
 
 export const { literals, definitions, ignoreLiterals, rootNode } = config.parseJSON(rawConfig as config.Json);
 
@@ -136,7 +136,7 @@ export function ast_to_config(ast: Node[], log: Logger = () => {}): config.Confi
 			}
 
 			if (term.kind != 'term' && term.kind != 'term_continue' && term.kind != 'term#0') {
-				_log(2, 'Invalid expression child');
+				_log(2, 'Invalid expression child: ' + term.kind);
 				continue;
 			}
 
