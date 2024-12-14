@@ -18,20 +18,19 @@ right_brace = '\}';
 
 ##ignore whitespace comment line_terminator
 
+# groups
 parenthesized = left_paren, expression, right_paren;
 optional = left_bracket, expression, right_bracket;
 repetition = left_brace, expression, right_brace;
 
-group = parenthesized | optional | repetition;
+term = string | identifier | parenthesized | optional | repetition;
 
-factor = string | identifier | group;
-
-term = factor, {',', factor};
-
-expression = term, {pipe, term};
+# TODO: Make this non-recursive. ATM this breaks the parser.
+sequence = term, {',', term};
+expression = sequence, {pipe, sequence};
 
 rule = identifier, '=', expression, ';';
 
-rule_list = (rule | directive), {rule | directive};
+rule_list = rule | directive;
 
 ##root rule_list

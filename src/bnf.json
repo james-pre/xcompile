@@ -28,37 +28,30 @@
 			]
 		},
 		{
-			"name": "group",
+			"name": "term",
 			"type": "oneof",
 			"pattern": [
+				{ "kind": "string", "type": "required" },
+				{ "kind": "identifier", "type": "required" },
 				{ "kind": "parenthesized", "type": "required" },
 				{ "kind": "optional", "type": "required" },
 				{ "kind": "repetition", "type": "required" }
 			]
 		},
 		{
-			"name": "factor",
-			"type": "oneof",
-			"pattern": [
-				{ "kind": "string", "type": "required" },
-				{ "kind": "identifier", "type": "required" },
-				{ "kind": "group", "type": "required" }
-			]
-		},
-		{
-			"name": "term#0",
+			"name": "sequence#0",
 			"type": "sequence",
 			"pattern": [
 				{ "kind": ",", "type": "required" },
-				{ "kind": "factor", "type": "required" }
+				{ "kind": "term", "type": "required" }
 			]
 		},
 		{
-			"name": "term",
+			"name": "sequence",
 			"type": "sequence",
 			"pattern": [
-				{ "kind": "factor", "type": "required" },
-				{ "kind": "term#0", "type": "repeated" }
+				{ "kind": "term", "type": "required" },
+				{ "kind": "sequence#0", "type": "repeated" }
 			]
 		},
 		{
@@ -66,14 +59,14 @@
 			"type": "sequence",
 			"pattern": [
 				{ "kind": "pipe", "type": "required" },
-				{ "kind": "term", "type": "required" }
+				{ "kind": "sequence", "type": "required" }
 			]
 		},
 		{
 			"name": "expression",
 			"type": "sequence",
 			"pattern": [
-				{ "kind": "term", "type": "required" },
+				{ "kind": "sequence", "type": "required" },
 				{ "kind": "expression#0", "type": "repeated" }
 			]
 		},
@@ -88,27 +81,11 @@
 			]
 		},
 		{
-			"name": "rule_list#0",
-			"type": "oneof",
-			"pattern": [
-				{ "kind": "rule", "type": "required" },
-				{ "kind": "directive", "type": "required" }
-			]
-		},
-		{
-			"name": "rule_list#1",
-			"type": "oneof",
-			"pattern": [
-				{ "kind": "rule", "type": "required" },
-				{ "kind": "directive", "type": "required" }
-			]
-		},
-		{
 			"name": "rule_list",
 			"type": "oneof",
 			"pattern": [
-				{ "kind": "rule_list#0", "type": "required" },
-				{ "kind": "rule_list#1", "type": "repeated" }
+				{ "kind": "rule", "type": "required" },
+				{ "kind": "directive", "type": "required" }
 			]
 		}
 	],

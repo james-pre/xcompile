@@ -135,7 +135,7 @@ export function ast_to_config(ast: Node[], log: Logger = () => {}): config.Confi
 				continue;
 			}
 
-			if (term.kind != 'term' && term.kind != 'term_continue' && term.kind != 'term#0') {
+			if (term.kind != 'sequence' && term.kind != 'sequence_continue' && term.kind != 'sequence#0') {
 				_log(2, 'Invalid expression child: ' + term.kind);
 				continue;
 			}
@@ -146,7 +146,7 @@ export function ast_to_config(ast: Node[], log: Logger = () => {}): config.Confi
 				continue;
 			}
 			for (let factor of term.children) {
-				if (factor.kind == 'term_continue' || factor.kind == 'term#0') {
+				if (factor.kind == 'sequence_continue' || factor.kind == 'sequence#0') {
 					factor = factor.children![1];
 				}
 				const node = factor.children?.[0] ?? factor;
