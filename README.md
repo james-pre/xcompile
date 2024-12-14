@@ -66,10 +66,11 @@ import { parse } from 'xcompile';
 
 const ast = parse({
 	source: `# This is AT&T assembly
-mov	$100, %eax # move 100 into eax
-mul $2,	%eax # multiply the value in eax by 2
-mov %eax,0x1000 # move eax's value into memory
-nop # do nothing
+
+mov	$100, %eax    # move 100 into eax
+mul $2,	%eax      # multiply the value in eax by 2
+mov %eax,0x1000   # move eax's value into memory
+nop               # do nothing
 `,
 	literals: [
 		{ name: 'number', pattern: /^(0x)?\d+/ },
@@ -169,11 +170,13 @@ const json = JSON.parse(readFileSync('asm.json', 'utf-8'));
 
 const ast = parse({
 	...config.parseJSON(json),
-	source: `# This is AT&T assembly
-mov	$100, %eax # move 100 into eax
-mul $2,	%eax # multiply the value in eax by 2
-mov %eax,0x1000 # move eax's value into memory
-nop # do nothing
+	source: `
+# This is AT&T assembly
+
+mov	$100, %eax    # move 100 into eax
+mul $2,	%eax      # multiply the value in eax by 2
+mov %eax,0x1000   # move eax's value into memory
+nop               # do nothing
 `,
 });
 
