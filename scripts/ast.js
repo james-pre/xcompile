@@ -1,6 +1,8 @@
+#!/usr/bin/env node
 import { readFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 import { parse, stringifyNode } from '../dist/parser.js';
+import { parseJSON as parseJSONConfig } from '../dist/config.js';
 
 const {
 	values: options,
@@ -15,7 +17,7 @@ const {
 });
 
 if (options.help || !input) {
-	console.log(`Usage: ${process.argv[0]} [options] <file>
+	console.log(`Usage: xcompile-dump-ast [options] <file>
 Options:
     --config,-c <path>  Specify the config file 
     --verbose,-V        Show verbose output. If passed multiple times, increases the verbosity level
@@ -25,14 +27,10 @@ Options:
 
 const verbosity = options.verbose?.filter(Boolean)?.length ?? 0;
 
-let config = {};
+let config;
 
 try {
-	const json = JSON.parse(readFileSync(options.json, 'utf-8'));
-
-	literals = json.literals.map(({ name, pattern }) => ({ name, pattern: new RegExp('^' + pattern) }));
-
-	definitions = json.definitions;
+	config = parseJSONConfig(JSON.parse(readFileSync(options.config, 'utf-8')));
 } catch (e) {
 	if ('errno' in e) console.error(e);
 	else console.error('Failed to resolve config:', e);
@@ -43,10 +41,6 @@ try {
 const ast = parse({
 	...config,
 	source: readFileSync(input, 'utf8'),
-	literals,
-	ignoreLiterals: ['whitespace', 'line_terminator', 'comment'],
-	definitions,
-	rootNode: 'instruction_list',
 	log(level, message, depth) {
 		if (verbosity < level) return;
 

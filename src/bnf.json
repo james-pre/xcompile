@@ -14,8 +14,8 @@
 		{ "name": "right_bracket", "pattern": "\\]" },
 		{ "name": "whitespace", "pattern": "[ \\t]+" },
 		{ "name": "line_terminator", "pattern": "[\\n;]+" },
-		{ "name": "directive", "pattern": "##[^\\n]+" },
-		{ "name": "comment", "pattern": "#[^\\n]+" }
+		{ "name": "directive", "pattern": "##\\w+ [^\\n]*" },
+		{ "name": "comment", "pattern": "#[^\\n]*" }
 	],
 	"ignoreLiterals": ["whitespace", "comment"],
 	"definitions": [

@@ -8,7 +8,7 @@ export interface Json {
 	ignoreLiterals: string[];
 }
 
-export interface Parsed {
+export interface Config {
 	literals: TokenDefinition[];
 	definitions: NodeDefinition[];
 	rootNode: string;
@@ -18,7 +18,7 @@ export interface Parsed {
 /**
  * Parses a JSON configuration into a normal configuration
  */
-export function parseJSON(config: Json): Parsed {
+export function parseJSON(config: Json): Config {
 	return {
 		...config,
 		literals: config.literals.map(literal => ({ name: literal.name, pattern: new RegExp('^' + literal.pattern) })),

@@ -32,17 +32,38 @@ const typeForGroup = {
 	left_paren: 'required',
 } as const;
 
-export function ast_to_config(ast: Node, log: Logger = () => {}): { definitions: NodeDefinition[]; literals: TokenDefinition[] } {
-	const definitions: NodeDefinition[] = [];
-	const literals: TokenDefinition[] = [];
+export function ast_to_config(ast: Node[], log: Logger = () => {}): config.Config {
+	const definitions: NodeDefinition[] = [],
+		literals: TokenDefinition[] = [],
+		ignoreLiterals: string[] = [];
 
 	let isOneOf = false,
 		currentNode: string,
+		rootNode: string | undefined,
 		groups = 0;
 
 	function processNode(node: Node, depth: number = 0) {
 		const _log = (level: number, text: string) => log(level, text, depth);
 		_log(3, `Processing ${node.kind} at ${node.line}:${node.column}`);
+
+		if (node.kind == 'directive') {
+			const [, directive, contents] = node.text.match(/##(\w+) (.*)/i)!;
+
+			switch (directive) {
+				case 'root':
+					if (rootNode) _log(0, `Warning: overwriting root node ("${rootNode}" -> "${contents}")`);
+					rootNode = contents;
+					break;
+				case 'ignore':
+					ignoreLiterals.push(...contents.split(/[ ,;]/));
+					break;
+				default:
+					_log(0, 'Warning: unsupported directive: ' + directive);
+			}
+
+			return;
+		}
+
 		if (node.kind != 'rule') {
 			// Recursively process child nodes
 			for (const child of node.children || []) {
@@ -184,7 +205,13 @@ export function ast_to_config(ast: Node, log: Logger = () => {}): { definitions:
 	}
 
 	// Start processing from the root node
-	processNode(ast);
+	for (const node of ast) {
+		processNode(node);
+	}
 
-	return { definitions, literals };
+	if (!rootNode) {
+		throw 'Missing root node';
+	}
+
+	return { definitions, literals, rootNode, ignoreLiterals };
 }

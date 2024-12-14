@@ -21,7 +21,7 @@ const {
 });
 
 if (options.help || !input) {
-	console.log(`Usage: ${process.argv[0]} [options] <file>\n
+	console.log(`Usage: xcompile-bnf [options] <file>\n
 Output options:
     --format,-f <format=js>  Output format (js, json)
     --output,-o <path>       Path to an output file
@@ -54,7 +54,15 @@ function logger(outputLevel) {
 
 const verbose = options.verbose?.filter(Boolean)?.length ?? 0;
 
-const tokens = bnf.tokenize(readFileSync(input, 'utf8'));
+let contents;
+try {
+	contents = readFileSync(input, 'utf8');
+} catch (e) {
+	console.error(e.message);
+	process.exit(1);
+}
+
+const tokens = bnf.tokenize(contents);
 
 if (options.tokens) {
 	for (const token of tokens) {
@@ -72,7 +80,7 @@ if (options.ast) {
 	if (options.parser == 'only') process.exit(0);
 }
 
-const config = bnf.ast_to_config(ast[0], logger(verbose));
+const config = bnf.ast_to_config(ast, logger(verbose));
 
 const write = data => (options.output ? writeFileSync(options.output, data) : console.log);
 

@@ -3,8 +3,10 @@ string          = '("(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\')';
 identifier      = '[a-zA-Z_]\w*';
 whitespace      = '[ \t]+';
 line_terminator	= "[\n;]+";
-comment         = "#.*";
+comment         = "#[^\\n]*";
 directive       = "##\w+ .*";
+
+##ignore whitespace comment
 
 parenthesized = '\(', expression, '\)';
 optional = '\[', expression, '\]';
@@ -19,3 +21,5 @@ expression = term, {('\|' | ','), term};
 rule = identifier, '=', expression, ';';
 
 rule_list = (rule | comment | directive), {line_terminator, rule | comment | directive};
+
+##root rule_list
