@@ -191,7 +191,7 @@ instruction 2:0
     identifier "mov" 2:0
     operand_list 2:4
         immediate "$100" 2:4
-        operand_list#0 2:8
+        operand_list_continue 2:8
             , "," 2:8
             register "%eax" 2:10
 line_terminator "\n" 2:34
@@ -199,7 +199,7 @@ instruction 3:0
     identifier "mul" 3:0
     operand_list 3:4
         immediate "$2" 3:4
-        operand_list#0 3:6
+        operand_list_continue 3:6
             , "," 3:6
             register "%eax" 3:8
 line_terminator "\n" 3:45
@@ -207,7 +207,7 @@ instruction 4:0
     identifier "mov" 4:0
     operand_list 4:4
         register "%eax" 4:4
-        operand_list#0 4:8
+        operand_list_continue 4:8
             , "," 4:8
             number "0x1000" 4:9
 line_terminator "\n" 4:46
