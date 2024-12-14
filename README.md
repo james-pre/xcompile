@@ -93,10 +93,7 @@ nop               # do nothing
 		{
 			name: 'operand_list_continue',
 			type: 'sequence',
-			pattern: [
-				{ kind: ',', type: 'required' },
-				{ kind: 'operand', type: 'required' },
-			],
+			pattern: [',', 'operand'],
 		},
 		{
 			name: 'operand_list',
