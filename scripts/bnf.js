@@ -14,7 +14,7 @@ const {
 		colors: { short: 'c', type: 'boolean' },
 		tokens: { short: 'T', type: 'string' },
 		parser: { short: 'P', type: 'string' },
-		verbose: { short: 'V', type: 'string', multiple: true },
+		verbose: { short: 'V', type: 'boolean', multiple: true },
 		help: { short: 'h', type: 'boolean', default: false },
 	},
 	allowPositionals: true,
@@ -45,6 +45,14 @@ if ((options.tokens == 'only' || options.parser == 'only') && (options.format ||
 	process.exit(1);
 }
 
+function logger(outputLevel) {
+	return function (level, message, depth) {
+		if (level > outputLevel) return;
+
+		console.log(' '.repeat(4 * depth) + (level > 1 ? '[debug] ' : '') + message);
+	};
+}
+
 const verbose = options.verbose?.filter(Boolean)?.length ?? 0;
 
 const tokens = bnf.tokenize(readFileSync(input, 'utf8'));
@@ -56,7 +64,7 @@ if (options.tokens) {
 	if (options.tokens == 'only') process.exit(0);
 }
 
-const ast = bnf.parse(tokens, parseInt(options.ast));
+const ast = bnf.parse(tokens, logger(parseInt(options.ast)));
 
 if (options.ast) {
 	for (const node of ast) {
@@ -65,7 +73,7 @@ if (options.ast) {
 	if (options.parser == 'only') process.exit(0);
 }
 
-const config = bnf.convert(ast[0], verbose);
+const config = bnf.convert(ast[0], logger(verbose));
 
 const write = data => (options.output ? writeFileSync(options.output, data) : console.log);
 

@@ -22,10 +22,13 @@ export function stringifyNode(node: Node, depth = 0): string {
 	);
 }
 
+export type Logger = (verbosity: number, message: string, depth: number) => void;
+
 export interface ParseOptionsShared {
 	definitions: NodeDefinition[];
 	rootNode: string;
 	ignoreLiterals: string[];
+	log?: Logger;
 	debug?(message: string): void;
 	verbose?(message: string): void;
 }
@@ -50,8 +53,8 @@ export function parse(options: ParseOptions): Node[] {
 	const literals = 'tokens' in options ? options.literals : [...options.literals].map(literal => literal.name);
 
 	function parseNode(kind: string, depth = 0): Node | null {
-		const debug = (message: string): void => options?.debug?.('  '.repeat(depth) + message);
-		const verbose = (message: string): void => options?.verbose?.('  '.repeat(depth + 1) + 'verbose: ' + message);
+		const debug = (message: string): void => options.log?.(1, message, depth);
+		const verbose = (message: string): void => options.log?.(2, message, depth);
 		if (literals.includes(kind)) {
 			while (options.ignoreLiterals.includes(tokens[position]?.kind)) {
 				position++;
@@ -96,7 +99,13 @@ export function parse(options: ParseOptions): Node[] {
 			}
 			case 'sequence': {
 				const children: Node[] = [];
+
+				while (options.ignoreLiterals.includes(tokens[position]?.kind)) {
+					position++;
+				}
+
 				const start = position;
+				const token = tokens[position];
 
 				debug(`Parsing sequence "${kind}"`);
 				for (const part of pattern) {
@@ -120,10 +129,9 @@ export function parse(options: ParseOptions): Node[] {
 					}
 				}
 
-				const token = tokens[start];
-				debug(`"${kind}" at ${token.line}:${token.column}`);
+				debug(`"${token.kind}" at ${token.line}:${token.column}`);
 				return {
-					kind: definition.name,
+					kind,
 					text: token.text,
 					position: token.position,
 					line: token.line,

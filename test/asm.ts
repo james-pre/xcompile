@@ -1,15 +1,15 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
-import { parse, stringifyNode } from '../src/parser';
 import type { NodeDefinition } from '../src/parser';
-import type { TokenDefinition } from '../src/tokens';
+import { parse, stringifyNode } from '../src/parser';
+import { tokenize } from '../src/tokens';
 
 const {
 	positionals: [input],
 	values: options,
 } = parseArgs({
 	options: {
-		verbose: { type: 'boolean', short: 'w', default: false },
+		verbose: { short: 'V', type: 'boolean', multiple: true },
 		json: { type: 'string', short: 'j' },
 	},
 	allowPositionals: true,
@@ -19,6 +19,8 @@ if (!input) {
 	console.error('Missing input path');
 	process.exit(1);
 }
+
+const verbosity = options.verbose?.filter(Boolean)?.length ?? 0;
 
 let literals = [
 	{ name: 'register', pattern: /^%\w+/ },
@@ -65,10 +67,14 @@ try {
 const ast = parse({
 	source: readFileSync(input, 'utf8'),
 	literals,
-	ignoreLiterals: ['whitespace'],
+	ignoreLiterals: ['whitespace', 'line_terminator', 'comment'],
 	definitions,
 	rootNode: 'instruction_list',
-	debug: options.verbose ? console.debug : undefined,
+	log(level: number, message: string, depth: number) {
+		if (level > verbosity) return;
+
+		console.log(' '.repeat(4 * depth) + (level > 1 ? '[debug] ' : '') + message);
+	},
 });
 
 console.log('AST:\n');
