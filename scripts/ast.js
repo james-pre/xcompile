@@ -48,7 +48,6 @@ const ast = parse({
 	},
 });
 
-console.log('AST:\n');
 for (const node of ast) {
 	console.log(stringifyNode(node));
 }
