@@ -221,7 +221,7 @@ Writing configuration can be very tedious, which is why you can generate JSON co
 
 asm.bnf:
 
-```bnf
+```ebnf
 # AT & T assembly
 # Oh, yeah, these are comments
 
