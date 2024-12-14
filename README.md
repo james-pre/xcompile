@@ -25,11 +25,13 @@ You can tokenize some text using `tokenize` and providing an iterable (e.g. arra
 ```ts
 import { tokenize } from 'xcompile';
 
-const source = `# This is AT&T assembly
-mov	$100, %eax # move 100 into eax
-mul $2,	%eax # multiply the value in eax by 2
-mov %eax,0x1000 # move eax's value into memory
-nop # do nothing
+const source = `
+# This is AT&T assembly
+
+mov	$100, %eax    # move 100 into eax
+mul $2,	%eax      # multiply the value in eax by 2
+mov %eax,0x1000   # move eax's value into memory
+nop               # do nothing
 `;
 
 const literals = [
