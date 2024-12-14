@@ -38,15 +38,21 @@ try {
 	process.exit(1);
 }
 
-const ast = parse({
-	...config,
-	source: readFileSync(input, 'utf8'),
-	log(level, message, depth) {
-		if (verbosity < level) return;
+let ast;
+try {
+	ast = parse({
+		...config,
+		source: readFileSync(input, 'utf8'),
+		log(level, message, depth) {
+			if (verbosity < level) return;
 
-		console.log(' '.repeat(4 * depth) + (level > 1 ? '[debug] ' : '') + message);
-	},
-});
+			console.log(' '.repeat(4 * depth) + (level > 1 ? '[debug] ' : '') + message);
+		},
+	});
+} catch (e) {
+	console.error('Error: parsing failed:', e);
+	process.exit(1);
+}
 
 for (const node of ast) {
 	console.log(stringifyNode(node));

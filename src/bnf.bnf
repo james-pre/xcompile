@@ -31,6 +31,4 @@ expression = sequence, {pipe, sequence};
 
 rule = identifier, '=', expression, ';';
 
-rule_list = rule | directive;
-
-##root rule_list
+##root rule directive

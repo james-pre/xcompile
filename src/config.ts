@@ -4,14 +4,14 @@ import type { TokenDefinition } from './tokens.js';
 export interface Json {
 	literals: { name: string; pattern: string }[];
 	definitions: NodeDefinition[];
-	rootNode: string;
+	rootNodes: string[];
 	ignoreLiterals: string[];
 }
 
 export interface Config {
 	literals: TokenDefinition[];
 	definitions: NodeDefinition[];
-	rootNode: string;
+	rootNodes: string[];
 	ignoreLiterals: string[];
 }
 

@@ -79,14 +79,6 @@
 				{ "kind": "expression", "type": "required" },
 				{ "kind": ";", "type": "required" }
 			]
-		},
-		{
-			"name": "rule_list",
-			"type": "oneof",
-			"pattern": [
-				{ "kind": "rule", "type": "required" },
-				{ "kind": "directive", "type": "required" }
-			]
 		}
 	],
 	"literals": [
@@ -107,6 +99,6 @@
 		{ "name": "=", "pattern": "=" },
 		{ "name": ";", "pattern": ";" }
 	],
-	"rootNode": "rule_list",
+	"rootNodes": ["rule", "directive"],
 	"ignoreLiterals": ["whitespace", "comment", "line_terminator"]
 }

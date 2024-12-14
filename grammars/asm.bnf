@@ -17,6 +17,4 @@ operand_list = operand, {",", operand};
 
 instruction	= identifier, [operand_list];
 
-instruction_list = (instruction | comment), {line_terminator, instruction | comment};
-
-##root instruction_list
+##root instruction

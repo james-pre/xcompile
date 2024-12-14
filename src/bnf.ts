@@ -5,7 +5,7 @@ import { parse } from './parser.js';
 import type { Token, TokenDefinition } from './tokens.js';
 import { tokenize } from './tokens.js';
 
-export const { literals, definitions, ignoreLiterals, rootNode } = config.parseJSON(rawConfig as config.Json);
+export const { literals, definitions, ignoreLiterals, rootNodes } = config.parseJSON(rawConfig as config.Json);
 
 /**
  * Shortcut for tokenize(source, bnf.literals);
@@ -17,11 +17,11 @@ function tokenizeBnf(source: string): Token[] {
 export { tokenizeBnf as tokenize };
 
 export function parseSource(source: string, log?: Logger): Node[] {
-	return parse({ ignoreLiterals, definitions, rootNode, log, source, literals });
+	return parse({ ignoreLiterals, definitions, rootNodes, log, source, literals });
 }
 
 function parseBnf(tokens: Token[], log?: Logger): Node[] {
-	return parse({ ignoreLiterals, definitions, rootNode, log, tokens, literals: literals.map(t => t.name) });
+	return parse({ ignoreLiterals, definitions, rootNodes, log, tokens, literals: literals.map(t => t.name) });
 }
 
 export { parseBnf as parse };
@@ -35,11 +35,11 @@ const typeForGroup = {
 export function ast_to_config(ast: Node[], log: Logger = () => {}): config.Config {
 	const definitions: NodeDefinition[] = [],
 		literals: TokenDefinition[] = [],
-		ignoreLiterals: string[] = [];
+		ignoreLiterals: string[] = [],
+		rootNodes: string[] = [];
 
 	let isOneOf = false,
 		currentNode: string,
-		rootNode: string | undefined,
 		groups = 0;
 
 	function processNode(node: Node, depth: number = 0) {
@@ -51,8 +51,7 @@ export function ast_to_config(ast: Node[], log: Logger = () => {}): config.Confi
 
 			switch (directive) {
 				case 'root':
-					if (rootNode) _log(0, `Warning: overwriting root node ("${rootNode}" -> "${contents}")`);
-					rootNode = contents;
+					rootNodes.push(...contents.split(/[ ,;]/));
 					break;
 				case 'ignore':
 					ignoreLiterals.push(...contents.split(/[ ,;]/));
@@ -101,9 +100,15 @@ export function ast_to_config(ast: Node[], log: Logger = () => {}): config.Confi
 		const maybeLiteral = pattern[0].kind;
 		const index = literals.findIndex(({ name }) => name == maybeLiteral);
 		if (index != -1 && pattern.length == 1 && pattern[0].type == 'required') {
+			let regex;
+			try {
+				regex = new RegExp('^' + maybeLiteral);
+			} catch (e: any) {
+				throw `Invalid literal: ${name}: ${e}`;
+			}
 			literals.splice(index, 1, {
 				name,
-				pattern: new RegExp('^' + maybeLiteral),
+				pattern: regex,
 			});
 			return;
 		}
@@ -159,7 +164,13 @@ export function ast_to_config(ast: Node[], log: Logger = () => {}): config.Confi
 						// Remove the surrounding quotes
 						const text = node.text.slice(1, -1).replaceAll('\\' + quote, quote);
 
-						literals.push({ name: text, pattern: new RegExp('^' + text) });
+						let regex;
+						try {
+							regex = new RegExp('^' + text);
+						} catch (e: any) {
+							throw `Invalid literal: ${text}: ${e.message}`;
+						}
+						literals.push({ name: text, pattern: regex });
 						pattern.push({ kind: text, type: 'required' });
 						break;
 					}
@@ -214,9 +225,9 @@ export function ast_to_config(ast: Node[], log: Logger = () => {}): config.Confi
 		processNode(node);
 	}
 
-	if (!rootNode) {
+	if (!rootNodes) {
 		throw 'Missing root node';
 	}
 
-	return { definitions, literals, rootNode, ignoreLiterals };
+	return { definitions, literals, rootNodes, ignoreLiterals };
 }

@@ -26,8 +26,10 @@ export type Logger = (verbosity: number, message: string, depth: number) => void
 
 export interface ParseOptionsShared {
 	definitions: NodeDefinition[];
-	rootNode: string;
+	rootNodes: string[];
 	ignoreLiterals: string[];
+	maxNodeDepth?: number;
+	maxCycles?: number;
 	log?: Logger;
 }
 
@@ -43,14 +45,40 @@ export interface ParseOnly extends ParseOptionsShared {
 
 export type ParseOptions = ParseOnly | ParseAndTokenize;
 
+function find_loop(strings: string[], counts: number): string[] | null {
+	const subArrayCounts: Map<string, number> = new Map();
+
+	for (let i = 0; i < strings.length - 1; i++) {
+		const subArray = strings[i] + ',' + strings[i + 1]; // Create a unique representation of the sub-array
+		subArrayCounts.set(subArray, (subArrayCounts.get(subArray) || 0) + 1);
+
+		if (subArrayCounts.get(subArray)! >= counts) return subArray.split(',');
+	}
+
+	return null; // No duplicate sub-array found with the specified threshold
+}
+
 export function parse(options: ParseOptions): Node[] {
+	const max_depth = options.maxNodeDepth ?? 100;
+	const max_cycles = options.maxCycles ?? 5;
 	let position = 0,
 		dirtyPosition = 0;
 
 	const tokens = 'tokens' in options ? options.tokens : tokenize(options.source, options.literals);
 	const literals = 'tokens' in options ? options.literals : [...options.literals].map(literal => literal.name);
 
-	function parseNode(kind: string, depth = 0): Node | null {
+	function parseNode(kind: string, parents: string[] = []): Node | null {
+		const depth = parents.length;
+
+		if (depth >= max_depth) throw 'Max depth exceeded when parsing ' + kind;
+
+		const loop = find_loop(parents, max_cycles);
+
+		if (loop) {
+			const node = tokens[position];
+			throw `Possible infinite loop: ${loop.join(' -> ')} -> ... at ${node.line}:${node.column}`;
+		}
+
 		const log = (level: number, message: string): void => options.log?.(level, message, depth);
 
 		if (literals.includes(kind)) {
@@ -77,7 +105,7 @@ export function parse(options: ParseOptions): Node[] {
 		const definition = options.definitions.find(def => def.name === kind);
 		if (!definition) {
 			log(1, `Error: Definition for node "${kind}" not found`);
-			throw new Error(`Definition for node "${kind}" not found`);
+			throw `Definition for node "${kind}" not found`;
 		}
 
 		const pattern = definition.pattern.map(part => (typeof part === 'string' ? { kind: part, type: 'required' } : part));
@@ -87,7 +115,7 @@ export function parse(options: ParseOptions): Node[] {
 				log(1, 'Parsing oneof: ' + kind);
 				for (const option of pattern) {
 					log(3, 'Attempting to parse alteration: ' + option.kind);
-					const node = parseNode(option.kind, depth + 1);
+					const node = parseNode(option.kind, [...parents, kind]);
 					if (node) {
 						log(3, `Resolved ${kind} to ${node.kind}`);
 						return node;
@@ -111,14 +139,14 @@ export function parse(options: ParseOptions): Node[] {
 					log(3, 'Attempting to parse sequence part: ' + part.kind);
 					if (part.type == 'repeated') {
 						let repeatedNode: Node | null;
-						while ((repeatedNode = parseNode(part.kind, depth + 1))) {
+						while ((repeatedNode = parseNode(part.kind, [...parents, kind]))) {
 							children.push(repeatedNode);
 						}
 						continue;
 					}
 
 					dirtyPosition = position;
-					const node = parseNode(part.kind, depth + 1);
+					const node = parseNode(part.kind, [...parents, kind]);
 					if (node) {
 						log(2, `Parsed ${node.kind} at ${node.line}:${node.column}`);
 						children.push(node);
@@ -147,11 +175,15 @@ export function parse(options: ParseOptions): Node[] {
 
 	const result: Node[] = [];
 	while (position < tokens.length) {
-		const node = parseNode(options.rootNode);
+		let node: Node | null = null;
+		for (const root of options.rootNodes) {
+			node = parseNode(root);
+			if (node) break;
+		}
 		if (!node) {
 			if (position >= tokens.length && options.ignoreLiterals.includes(tokens.at(-1)!.kind)) break;
 			const token = tokens[dirtyPosition || position];
-			throw new Error(`Unexpected ${token.kind} "${token.text}" at ${token.line}:${token.column}`);
+			throw `Unexpected ${token.kind} "${token.text}" at ${token.line}:${token.column}`;
 		}
 		result.push(node);
 	}
