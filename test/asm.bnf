@@ -1,7 +1,7 @@
 # AT & T assembly
 
 number			= "(0x)?\d+";
-identifier		= "\w+";
+identifier		= "[a-zA-Z_]\w*";
 register		= "%\w+";
 immediate		= "\$(0x)?\d+";
 whitespace		= "[ \t]+";
@@ -15,3 +15,6 @@ operand_list = operand, {",", operand};
 instruction	= identifier, [operand_list];
 
 instruction_list = (instruction | comment), {line_terminator, instruction | comment};
+
+#ignore whitespace line_terminator comment
+#root instruction_list

@@ -1,0 +1,21 @@
+
+string          = '("(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\')';
+identifier      = '[a-zA-Z_]\w*';
+whitespace      = '[ \t]+';
+line_terminator	= "[\n;]+";
+comment         = "#.*";
+directive       = "##\w+ .*";
+
+parenthesized = '\(', expression, '\)';
+optional = '\[', expression, '\]';
+repetition = '\{', expression, '\}';
+
+group = parenthesized | optional | repetition;
+
+term = string | identifier | group;
+
+expression = term, {('\|' | ','), term};
+
+rule = identifier, '=', expression, ';';
+
+rule_list = (rule | comment | directive), {line_terminator, rule | comment | directive};

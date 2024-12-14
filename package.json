@@ -35,6 +35,7 @@
 		"format:check": "prettier --check .",
 		"lint": "tsc -p tsconfig.json --noEmit && eslint src",
 		"build": "tsc -p tsconfig.json",
+		"build:bnf": "npx xcompile-bnf src/bnf.bnf -f json -o src/bnf.json",
 		"build:docs": "typedoc",
 		"prepublishOnly": "npm run build"
 	},

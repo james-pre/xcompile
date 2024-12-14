@@ -1,0 +1,44 @@
+{
+	"literals": [
+		{ "name": "identifier", "pattern": "[a-zA-Z_]\\w*" },
+		{ "name": "string", "pattern": "(\"(?:\\\\.|[^\"\\\\])*\"|'(?:\\\\.|[^'\\\\])*')" },
+		{ "name": "equal", "pattern": "=" },
+		{ "name": "pipe", "pattern": "\\|" },
+		{ "name": "comma", "pattern": "," },
+		{ "name": "semicolon", "pattern": ";" },
+		{ "name": "left_paren", "pattern": "\\(" },
+		{ "name": "right_paren", "pattern": "\\)" },
+		{ "name": "left_brace", "pattern": "\\{" },
+		{ "name": "right_brace", "pattern": "\\}" },
+		{ "name": "left_bracket", "pattern": "\\[" },
+		{ "name": "right_bracket", "pattern": "\\]" },
+		{ "name": "whitespace", "pattern": "[ \\t]+" },
+		{ "name": "line_terminator", "pattern": "[\\n;]+" },
+		{ "name": "directive", "pattern": "##[^\\n]+" },
+		{ "name": "comment", "pattern": "#[^\\n]+" }
+	],
+	"ignoreLiterals": ["whitespace", "comment"],
+	"definitions": [
+		{ "name": "rule", "type": "sequence", "pattern": ["identifier", "equal", "expression", "semicolon"] },
+		{ "name": "expression_continue", "type": "sequence", "pattern": ["pipe", "term"] },
+		{ "name": "expression", "type": "sequence", "pattern": ["term", { "kind": "expression_continue", "type": "repeated" }] },
+		{ "name": "term_continue", "type": "sequence", "pattern": ["comma", "factor"] },
+		{ "name": "term", "type": "sequence", "pattern": ["factor", { "kind": "term_continue", "type": "repeated" }] },
+		{ "name": "factor", "type": "oneof", "pattern": ["string", "identifier", "group"] },
+		{ "name": "group", "type": "oneof", "pattern": ["repetition", "optional", "parenthesized"] },
+		{ "name": "parenthesized", "type": "sequence", "pattern": ["left_paren", "expression", "right_paren"] },
+		{ "name": "repetition", "type": "sequence", "pattern": ["left_brace", "expression", "right_brace"] },
+		{ "name": "optional", "type": "sequence", "pattern": ["left_bracket", "expression", "right_bracket"] },
+		{ "name": "rule_list_continue", "type": "sequence", "pattern": [{ "kind": "rule", "type": "optional" }, { "kind": "directive", "type": "optional" }, "line_terminator"] },
+		{
+			"name": "rule_list",
+			"type": "sequence",
+			"pattern": [
+				{ "kind": "rule", "type": "optional" },
+				{ "kind": "directive", "type": "optional" },
+				{ "kind": "rule_list_continue", "type": "repeated" }
+			]
+		}
+	],
+	"rootNode": "rule_list"
+}

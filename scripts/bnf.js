@@ -21,7 +21,7 @@ const {
 });
 
 if (options.help || !input) {
-	console.log(`Usage: xcompile-bnf [options] <file>\n
+	console.log(`Usage: ${process.argv[0]} [options] <file>\n
 Output options:
     --format,-f <format=js>  Output format (js, json)
     --output,-o <path>       Path to an output file
@@ -30,8 +30,7 @@ Output options:
 Debugging options:
     --tokens,-T [only]       Show tokenizer output. If 'only', only the tokenizer output will be shown.
     --parser,-P [only]       Show parser output. If 'only', only the parser output will be shown.
-    --verbose,-V             Show verbose output. If passed multiple times, increases the verbosity level.
-`);
+    --verbose,-V             Show verbose output. If passed multiple times, increases the verbosity level.`);
 	process.exit(0);
 }
 
@@ -47,7 +46,7 @@ if ((options.tokens == 'only' || options.parser == 'only') && (options.format ||
 
 function logger(outputLevel) {
 	return function (level, message, depth) {
-		if (level > outputLevel) return;
+		if (outputLevel < level) return;
 
 		console.log(' '.repeat(4 * depth) + (level > 1 ? '[debug] ' : '') + message);
 	};
@@ -64,7 +63,7 @@ if (options.tokens) {
 	if (options.tokens == 'only') process.exit(0);
 }
 
-const ast = bnf.parse(tokens, logger(parseInt(options.ast)));
+const ast = bnf.parse(tokens, logger(options.ast ? parseInt(options.ast) : 0));
 
 if (options.ast) {
 	for (const node of ast) {
@@ -73,7 +72,7 @@ if (options.ast) {
 	if (options.parser == 'only') process.exit(0);
 }
 
-const config = bnf.convert(ast[0], logger(verbose));
+const config = bnf.ast_to_config(ast[0], logger(verbose));
 
 const write = data => (options.output ? writeFileSync(options.output, data) : console.log);
 

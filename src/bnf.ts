@@ -2,24 +2,10 @@ import type { DefinitionPart, Logger, Node, NodeDefinition } from './parser.js';
 import { parse } from './parser.js';
 import type { Token, TokenDefinition } from './tokens.js';
 import { tokenize } from './tokens.js';
+import rawConfig from './bnf.json' with { type: 'json' };
+import * as config from './config.js';
 
-export const literals: TokenDefinition[] = [
-	{ name: 'identifier', pattern: /^[a-zA-Z_]\w*/ }, // Matches rule names like `identifier`, `register`, etc.
-	{ name: 'string', pattern: /^"[^"]*"/ }, // Quoted literals like `"0x"`, `"%"`, etc.
-	{ name: 'equal', pattern: /^=/ }, // Equals sign (`=`)
-	{ name: 'pipe', pattern: /^\|/ }, // Pipe (alternation)
-	{ name: 'comma', pattern: /^,/ }, // Comma (sequence separator)
-	{ name: 'semicolon', pattern: /^;/ }, // Semicolon (end of rule)
-	{ name: 'left_paren', pattern: /^\(/ }, // parenthesized start
-	{ name: 'right_paren', pattern: /^\)/ }, // parenthesized end
-	{ name: 'left_brace', pattern: /^\{/ }, // repetition start
-	{ name: 'right_brace', pattern: /^\}/ }, // repetition end
-	{ name: 'left_bracket', pattern: /^\[/ }, // optional start
-	{ name: 'right_bracket', pattern: /^\]/ }, // optional end
-	{ name: 'whitespace', pattern: /^[ \t]+/ }, // Whitespace
-	{ name: 'line_terminator', pattern: /^[\n;]+/ }, // Newlines or semicolons as line terminators
-	{ name: 'comment', pattern: /^#[^\n]+/ },
-];
+export const { literals, definitions, ignoreLiterals, rootNode } = config.parseJSON(rawConfig as config.Json);
 
 /**
  * Shortcut for tokenize(source, bnf.literals);
@@ -30,98 +16,12 @@ function tokenizeBnf(source: string): Token[] {
 
 export { tokenizeBnf as tokenize };
 
-export const definitions: NodeDefinition[] = [
-	// BNF Rule Definition: identifier = expression ;
-	{
-		name: 'rule',
-		type: 'sequence',
-		pattern: ['identifier', 'equal', 'expression', 'semicolon'],
-	},
-	// Expression: Sequence of terms separated by '|'
-	{
-		name: 'expression_continue',
-		type: 'sequence',
-		pattern: ['pipe', 'term'],
-	},
-	{
-		name: 'expression',
-		type: 'sequence',
-		pattern: ['term', { kind: 'expression_continue', type: 'repeated' }],
-	},
-	// Term: Sequence of factors separated by commas
-	{
-		name: 'term_continue',
-		type: 'sequence',
-		pattern: ['comma', 'factor'],
-	},
-	{
-		name: 'term',
-		type: 'sequence',
-		pattern: ['factor', { kind: 'term_continue', type: 'repeated' }],
-	},
-	// Factor: A factor is either a string, identifier, or a group (repetition, optional)
-	{
-		name: 'factor',
-		type: 'oneof',
-		pattern: ['string', 'identifier', 'group'],
-	},
-	// Group: {...} or [...] for repetition or optional
-	{
-		name: 'group',
-		type: 'oneof',
-		pattern: ['repetition', 'optional', 'parenthesized'],
-	},
-	{
-		name: 'parenthesized',
-		type: 'sequence',
-		pattern: ['left_paren', 'expression', 'right_paren'],
-	},
-	{
-		name: 'repetition',
-		type: 'sequence',
-		pattern: ['left_brace', 'expression', 'right_brace'],
-	},
-	{
-		name: 'optional',
-		type: 'sequence',
-		pattern: ['left_bracket', 'expression', 'right_bracket'],
-	},
-	// Rule list: Set of BNF rules separated by newlines or semicolons
-	{
-		name: 'rule_list_continue',
-		type: 'sequence',
-		pattern: [{ kind: 'rule', type: 'optional' }, 'line_terminator'],
-	},
-	{
-		name: 'rule_list',
-		type: 'sequence',
-		pattern: [
-			{ kind: 'rule', type: 'optional' },
-			{ kind: 'rule_list_continue', type: 'repeated' },
-		],
-	},
-];
-
 export function parseSource(source: string, log?: Logger): Node[] {
-	return parse({
-		ignoreLiterals: ['whitespace', 'comment'],
-		definitions,
-		rootNode: 'rule_list',
-		log,
-		source,
-		literals,
-	});
+	return parse({ ignoreLiterals, definitions, rootNode, log, source, literals });
 }
 
 function parseBnf(tokens: Token[], log?: Logger): Node[] {
-	return parse({
-		ignoreLiterals: ['whitespace', 'comment'],
-		definitions,
-		rootNode: 'rule_list',
-		log,
-		tokens,
-		literals: literals.map(t => t.name),
-	});
+	return parse({ ignoreLiterals, definitions, rootNode, log, tokens, literals: literals.map(t => t.name) });
 }
 
 export { parseBnf as parse };
@@ -132,7 +32,7 @@ const typeForGroup = {
 	left_paren: 'required',
 } as const;
 
-export function convert(ast: Node, log: Logger = () => {}): { definitions: NodeDefinition[]; literals: TokenDefinition[] } {
+export function ast_to_config(ast: Node, log: Logger = () => {}): { definitions: NodeDefinition[]; literals: TokenDefinition[] } {
 	const definitions: NodeDefinition[] = [];
 	const literals: TokenDefinition[] = [];
 
