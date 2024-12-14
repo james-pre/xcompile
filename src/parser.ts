@@ -29,8 +29,6 @@ export interface ParseOptionsShared {
 	rootNode: string;
 	ignoreLiterals: string[];
 	log?: Logger;
-	debug?(message: string): void;
-	verbose?(message: string): void;
 }
 
 export interface ParseAndTokenize extends ParseOptionsShared {
