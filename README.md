@@ -227,13 +227,13 @@ asm.bnf:
 
 # define a rule using <name> = <value>.
 # In this case, we define "literals", which are for raw tokens and don't have any structure
-number			= "(0x)?\d+";
-identifier		= "[a-zA-Z_]\w*";
-register		= "%\w+";
-immediate		= "\$(0x)?\d+";
-whitespace		= "[ \t]+";
-line_terminator	= "[\n;]+";
-comment			= "#.*";
+number          = "(0x)?\d+";
+identifier      = "[a-zA-Z_]\w*";
+register        = "%\w+";
+immediate       = "\$(0x)?\d+";
+whitespace      = "[ \t]+";
+line_terminator = "[\n;]+";
+comment         = "#.*";
 
 # A double "#" indicates a directive. `ignore` is used to define which tokens will be ignored
 ##ignore whitespace line_terminator comment

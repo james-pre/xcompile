@@ -1,12 +1,12 @@
 # AT & T assembly
 
-number			= "(0x)?\d+";
-identifier		= "[a-zA-Z_]\w*";
-register		= "%\w+";
-immediate		= "\$(0x)?\d+";
-whitespace		= "[ \t]+";
-line_terminator	= "[\n;]+";
-comment			= "#.*";
+number          = "(0x)?\d+";
+identifier      = "[a-zA-Z_]\w*";
+register        = "%\w+";
+immediate       = "\$(0x)?\d+";
+whitespace      = "[ \t]+";
+line_terminator = "[\n;]+";
+comment         = "#.*";
 
 ##ignore whitespace line_terminator comment
 
