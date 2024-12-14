@@ -1,8 +1,7 @@
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 import type { NodeDefinition } from '../src/parser';
 import { parse, stringifyNode } from '../src/parser';
-import { tokenize } from '../src/tokens';
 
 const {
 	positionals: [input],

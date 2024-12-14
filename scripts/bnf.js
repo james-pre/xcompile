@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 import { readFileSync, writeFileSync } from 'node:fs';
 import { inspect, parseArgs } from 'node:util';
-import { stringifyNode } from '../dist/parser.js';
 import * as bnf from '../dist/bnf.js';
+import { stringifyNode } from '../dist/parser.js';
 
 const {
 	positionals: [input],
