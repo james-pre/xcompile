@@ -61,6 +61,7 @@ function find_loop(strings: string[], counts: number): string[] | null {
 
 interface ParseInfo {
 	parseNodeCalls: number;
+	nodesParsed: number;
 }
 
 export const parseInfo = new Map<string, ParseInfo>();
@@ -76,7 +77,9 @@ export function parse(options: ParseOptions): Node[] {
 	const tokens = 'tokens' in options ? options.tokens : tokenize(options.source, options.literals);
 	const literals = 'tokens' in options ? options.literals : [...options.literals].map(literal => literal.name);
 
-	if (id) parseInfo.set(id, { parseNodeCalls: 0 });
+	const attempts = new Map<string, Node | null>();
+
+	if (id) parseInfo.set(id, { parseNodeCalls: 0, nodesParsed: 0 });
 
 	function parseNode(kind: string, parents: string[] = []): Node | null {
 		if (id) parseInfo.get(id)!.parseNodeCalls++;
@@ -85,6 +88,22 @@ export function parse(options: ParseOptions): Node[] {
 
 		if (depth >= max_depth) throw 'Max depth exceeded when parsing ' + kind;
 
+		const log = (level: number, message: string): void => options.log?.(level, message, depth);
+
+		const attempt = kind + position + (depth == 0 ? '' : parents.at(-1));
+
+		const _cache = (node: Node | null) => {
+			attempts.set(attempt, node);
+			return node;
+		};
+
+		if (attempts.has(attempt) && find_loop(parents, 3)) {
+			log(3, `Already parsed ${kind} at ${position}`);
+			return attempts.get(attempt) ?? null;
+		}
+
+		_cache(null);
+
 		const loop = find_loop(parents, max_cycles);
 
 		if (loop) {
@@ -92,7 +111,7 @@ export function parse(options: ParseOptions): Node[] {
 			throw `Possible infinite loop: ${loop.join(' -> ')} -> ... at ${node.line}:${node.column}`;
 		}
 
-		const log = (level: number, message: string): void => options.log?.(level, message, depth);
+		if (id) parseInfo.get(id)!.nodesParsed++;
 
 		if (literals.includes(kind)) {
 			while (options.ignoreLiterals.includes(tokens[position]?.kind)) {
@@ -112,7 +131,7 @@ export function parse(options: ParseOptions): Node[] {
 			}
 
 			position++;
-			return { ...token, children: [] };
+			return _cache({ ...token, children: [] });
 		}
 
 		const definition = options.definitions.find(def => def.name === kind);
@@ -131,7 +150,7 @@ export function parse(options: ParseOptions): Node[] {
 					const node = parseNode(option.kind, [...parents, kind]);
 					if (node) {
 						log(3, `Resolved ${kind} to ${node.kind}`);
-						return node;
+						return _cache(node);
 					}
 				}
 				log(1, 'Warning: No matches for alternation');
@@ -171,14 +190,14 @@ export function parse(options: ParseOptions): Node[] {
 				}
 
 				log(1, `"${token.kind}" at ${token.line}:${token.column}`);
-				return {
+				return _cache({
 					kind,
 					text: token.text,
 					position: token.position,
 					line: token.line,
 					column: token.column,
 					children,
-				};
+				});
 			}
 			default:
 				console.warn('Invalid node kind:', kind);

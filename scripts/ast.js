@@ -42,6 +42,16 @@ try {
 	process.exit(1);
 }
 
+function dump_info() {
+	if (!options.info) return;
+
+	const info = parseInfo.get(input);
+
+	for (const [k, v] of Object.entries(info)) {
+		console.error(k + ': ', v);
+	}
+}
+
 let ast;
 try {
 	ast = parse({
@@ -54,16 +64,10 @@ try {
 		},
 		id: input,
 	});
-	if (options.info) {
-		const info = parseInfo.get(input);
-		console.error('parseNode calls:', info.parseNodeCalls);
-	}
+	dump_info();
 } catch (e) {
 	console.error('Error: parsing failed:', e);
-	if (options.info) {
-		const info = parseInfo.get(input);
-		console.error('parseNode calls:', info.parseNodeCalls);
-	}
+	dump_info();
 	process.exit(1);
 }
 
