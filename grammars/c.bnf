@@ -1,0 +1,97 @@
+# C Language BNF
+# Probably not stable.
+
+identifier         = '[a-zA-Z_][a-zA-Z_0-9]*';
+number             = '(0[xX][0-9a-fA-F]+|\d+)';
+string_literal     = '"([^"\\]|\\.)*"';
+character_literal  = '\'([^\\]|\\.)\'';
+whitespace         = '\s+';
+comment            = '//.*|/\*[^*]*(\*[^/][^*]*)*\*/';
+directive          = '#[^\n]*';
+
+left_paren  = '\(';
+right_paren = '\)';
+
+##ignore whitespace comment directive
+
+# Keywords
+
+type_namespace = 'enum' | 'struct' | 'union';
+
+type_keyword = 'long' | 'short' | 'signed' | 'unsigned';
+
+storage_specifier = 'inline' | 'register' | 'static';
+
+keyword = type_keyword | type_namespace | storage_specifier | 'break' | 'case' | 'continue' | 'default' | 'do' | 'else' | 'for' | 'goto' | 'if' | 'return' | 'sizeof' | 'switch' | 'typedef' | 'void' | 'while';
+
+# Operators and punctuation
+math_only_operator = '\+\+|--|\+|-|/|%|<<|>>|<|<=|>|>=|==|!=|&|\||\^|\!|~|&&|\|\|';
+ptr_or_mul = '\*';
+math_operator = ptr_or_mul | math_only_operator;
+assignment_operator = '\+=|-=|\*=|/=|%=|<<=|>>=|&=|\|=|\^=';
+
+operator = math_operator | assignment_operator | '=' | '\?|:' | ',' | ';' | left_paren | right_paren | '\[|\]';
+
+# Expressions
+nested_expression = left_paren, expression, right_paren;
+
+binary_expression = expression, operator, expression;
+
+expression = primary_expression
+		   | nested_expression
+		   | binary_expression;
+
+argument_list = expression, {',', expression};
+
+function_call = identifier, left_paren, [argument_list], right_paren;
+
+primary_expression = function_call
+				   | identifier
+				   | number
+				   | string_literal
+				   | character_literal;
+
+constant_expression = number | character_literal | (left_paren, constant_expression, operator, constant_expression, right_paren);
+
+
+# Declarations
+declaration = type_specifier, declarator;
+
+full_declaration = ['extern'], declaration, ['=', initializer], ';';
+
+type_specifier =  ['const' | 'volatile'], [type_keyword | type_namespace], identifier;
+
+declarator = {ptr_or_mul}, identifier, ['\[', [number], '\]'];
+
+initializer = expression | '\{', initializer_list, '\}';
+
+initializer_list = initializer, {',', initializer};
+
+# Statements
+statement =  expression_statement
+          | iteration_statement
+          | jump_statement
+          | compound_statement
+          | selection_statement
+		  | labeled_statement;
+
+labeled_statement = (identifier | 'case', constant_expression | 'default'), ':', statement;
+
+compound_statement = '\{', {full_declaration | statement}, '\}';
+
+expression_statement = [expression], ';';
+
+selection_statement = 'if', left_paren, expression, right_paren, statement, ['else', statement];
+
+iteration_statement = ('while', left_paren, expression, right_paren, statement)
+					| ('do', statement, 'while', left_paren, expression, right_paren, ';')
+					| ('for', left_paren, [expression], ';', [expression], ';', [expression], right_paren, statement);
+
+jump_statement = 'goto', identifier, ';' | 'continue', ';' | 'break', ';' | 'return', [expression], ';';
+
+function_definition = type_specifier, declarator, left_paren, [declaration, {',', declaration}], right_paren, compound_statement;
+
+# Translation Unit
+translation_unit = full_declaration | function_definition;
+
+##root translation_unit

@@ -62,6 +62,7 @@ function find_loop(strings: string[], counts: number): string[] | null {
 interface ParseInfo {
 	parseNodeCalls: number;
 	nodesParsed: number;
+	ignoredLiterals: number;
 }
 
 export const parseInfo = new Map<string, ParseInfo>();
@@ -71,15 +72,23 @@ export function parse(options: ParseOptions): Node[] {
 	const max_cycles = options.maxCycles ?? 5;
 	const id = options.id;
 
+	if (id) parseInfo.set(id, { parseNodeCalls: 0, nodesParsed: 0, ignoredLiterals: 0 });
+
 	let position = 0,
 		dirtyPosition = 0;
 
-	const tokens = 'tokens' in options ? options.tokens : tokenize(options.source, options.literals);
+	const raw_tokens = 'tokens' in options ? options.tokens : tokenize(options.source, options.literals);
+
+	const tokens: Token[] = [];
+
+	for (let i = 0; i < raw_tokens.length; i++) {
+		if (!options.ignoreLiterals.includes(raw_tokens[i].kind)) tokens.push(raw_tokens[i]);
+		else if (id) parseInfo.get(id)!.ignoredLiterals++;
+	}
+
 	const literals = 'tokens' in options ? options.literals : [...options.literals].map(literal => literal.name);
 
 	const attempts = new Map<string, Node | null>();
-
-	if (id) parseInfo.set(id, { parseNodeCalls: 0, nodesParsed: 0 });
 
 	function parseNode(kind: string, parents: string[] = []): Node | null {
 		if (id) parseInfo.get(id)!.parseNodeCalls++;
@@ -114,10 +123,6 @@ export function parse(options: ParseOptions): Node[] {
 		if (id) parseInfo.get(id)!.nodesParsed++;
 
 		if (literals.includes(kind)) {
-			while (options.ignoreLiterals.includes(tokens[position]?.kind)) {
-				position++;
-			}
-
 			const token = tokens[position];
 
 			if (!token) {
@@ -158,10 +163,6 @@ export function parse(options: ParseOptions): Node[] {
 			}
 			case 'sequence': {
 				const children: Node[] = [];
-
-				while (options.ignoreLiterals.includes(tokens[position]?.kind)) {
-					position++;
-				}
 
 				const start = position;
 				const token = tokens[position];
