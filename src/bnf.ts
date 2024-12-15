@@ -38,8 +38,7 @@ export function ast_to_config(ast: Node[], log: Logger = () => {}): config.Confi
 		ignoreLiterals: string[] = [],
 		rootNodes: string[] = [];
 
-	let isOneOf = false,
-		currentNode: string,
+	let currentNode: string,
 		groups = 0;
 
 	function processNode(node: Node, depth: number = 0) {
@@ -84,7 +83,7 @@ export function ast_to_config(ast: Node[], log: Logger = () => {}): config.Confi
 		currentNode = name;
 		groups = 0;
 
-		const pattern = processExpression(expression, depth + 1);
+		const [pattern, isAlternation] = processExpression(expression, depth + 1);
 
 		/*
 			Inline single-use literals
@@ -116,27 +115,28 @@ export function ast_to_config(ast: Node[], log: Logger = () => {}): config.Confi
 		// Add the NodeDefinition for this rule
 		definitions.push({
 			name,
-			type: isOneOf ? 'oneof' : 'sequence',
+			type: isAlternation ? 'alternation' : 'sequence',
 			pattern: pattern.map(part => (typeof part === 'string' ? { kind: part, type: 'required' } : part)),
 		});
 	}
 
-	function processExpression(expression: Node, depth: number = 0): DefinitionPart[] {
-		isOneOf = false;
+	function processExpression(expression: Node, depth: number = 0): [DefinitionPart[], boolean] {
+		let isAlternation = false;
 		const _log = (level: number, text: string) => log(level, text, depth);
 		const pattern: DefinitionPart[] = [];
 
 		for (const term of expression.children || []) {
 			if (term.kind == 'pipe') {
-				isOneOf = true;
+				isAlternation = true;
 				_log(2, 'Found pipe in expression');
 				continue;
 			}
 
 			if (term.kind == 'expression_continue' || term.kind == 'expression#0') {
 				_log(2, 'Found expression_continue');
-				pattern.push(...processExpression(term, depth + 1));
-				isOneOf = true;
+				let next;
+				[next, isAlternation] = processExpression(term, depth + 1);
+				pattern.push(...next);
 				continue;
 			}
 
@@ -188,7 +188,7 @@ export function ast_to_config(ast: Node[], log: Logger = () => {}): config.Confi
 
 						const type = typeForGroup[node.kind];
 
-						const subPattern = processExpression(inner, depth + 1);
+						const [subPattern, isAlternation] = processExpression(inner, depth + 1);
 
 						// Check if subPattern contains another rule name, if so, no need to create a new group
 						const existing = subPattern.length == 1 && subPattern[0].kind !== 'string' ? subPattern[0].kind : null;
@@ -201,7 +201,7 @@ export function ast_to_config(ast: Node[], log: Logger = () => {}): config.Confi
 
 						definitions.push({
 							name: subName,
-							type: isOneOf ? 'oneof' : 'sequence',
+							type: isAlternation ? 'alternation' : 'sequence',
 							pattern: subPattern,
 						});
 
@@ -217,7 +217,7 @@ export function ast_to_config(ast: Node[], log: Logger = () => {}): config.Confi
 			}
 		}
 
-		return pattern;
+		return [pattern, isAlternation];
 	}
 
 	// Start processing from the root node

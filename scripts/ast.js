@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { readFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
-import { parse, stringifyNode } from '../dist/parser.js';
+import { parse, parseInfo, stringifyNode } from '../dist/parser.js';
 import { parseJSON as parseJSONConfig } from '../dist/config.js';
 
 const {
@@ -10,6 +10,8 @@ const {
 } = parseArgs({
 	options: {
 		verbose: { short: 'V', type: 'boolean', multiple: true },
+		quiet: { short: 'q', type: 'boolean', multiple: true },
+		info: { short: 'I', type: 'boolean', multiple: true },
 		config: { short: 'c', type: 'string' },
 		help: { short: 'h', type: 'boolean', default: false },
 	},
@@ -19,7 +21,9 @@ const {
 if (options.help || !input) {
 	console.log(`Usage: xcompile-dump-ast [options] <file>
 Options:
-    --config,-c <path>  Specify the config file 
+    --config,-c <path>  Specify the config file
+    --quiet,-q          Don't output the AST
+    --info,-I           Output parser info
     --verbose,-V        Show verbose output. If passed multiple times, increases the verbosity level
     --help,-h           Display this help message`);
 	process.exit(1);
@@ -48,11 +52,22 @@ try {
 
 			console.log(' '.repeat(4 * depth) + (level > 1 ? '[debug] ' : '') + message);
 		},
+		id: input,
 	});
+	if (options.info) {
+		const info = parseInfo.get(input);
+		console.error('parseNode calls:', info.parseNodeCalls);
+	}
 } catch (e) {
 	console.error('Error: parsing failed:', e);
+	if (options.info) {
+		const info = parseInfo.get(input);
+		console.error('parseNode calls:', info.parseNodeCalls);
+	}
 	process.exit(1);
 }
+
+if (options.quiet) process.exit(0);
 
 for (const node of ast) {
 	console.log(stringifyNode(node));

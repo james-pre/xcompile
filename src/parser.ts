@@ -7,7 +7,7 @@ export interface DefinitionPart {
 
 export interface NodeDefinition {
 	name: string;
-	type: 'sequence' | 'oneof';
+	type: 'sequence' | 'alternation';
 	pattern: (string | DefinitionPart)[];
 }
 
@@ -31,6 +31,7 @@ export interface ParseOptionsShared {
 	maxNodeDepth?: number;
 	maxCycles?: number;
 	log?: Logger;
+	id?: string;
 }
 
 export interface ParseAndTokenize extends ParseOptionsShared {
@@ -58,16 +59,28 @@ function find_loop(strings: string[], counts: number): string[] | null {
 	return null; // No duplicate sub-array found with the specified threshold
 }
 
+interface ParseInfo {
+	parseNodeCalls: number;
+}
+
+export const parseInfo = new Map<string, ParseInfo>();
+
 export function parse(options: ParseOptions): Node[] {
 	const max_depth = options.maxNodeDepth ?? 100;
 	const max_cycles = options.maxCycles ?? 5;
+	const id = options.id;
+
 	let position = 0,
 		dirtyPosition = 0;
 
 	const tokens = 'tokens' in options ? options.tokens : tokenize(options.source, options.literals);
 	const literals = 'tokens' in options ? options.literals : [...options.literals].map(literal => literal.name);
 
+	if (id) parseInfo.set(id, { parseNodeCalls: 0 });
+
 	function parseNode(kind: string, parents: string[] = []): Node | null {
+		if (id) parseInfo.get(id)!.parseNodeCalls++;
+
 		const depth = parents.length;
 
 		if (depth >= max_depth) throw 'Max depth exceeded when parsing ' + kind;
@@ -111,8 +124,8 @@ export function parse(options: ParseOptions): Node[] {
 		const pattern = definition.pattern.map(part => (typeof part === 'string' ? { kind: part, type: 'required' } : part));
 
 		switch (definition.type) {
-			case 'oneof': {
-				log(1, 'Parsing oneof: ' + kind);
+			case 'alternation': {
+				log(1, 'Parsing alternation: ' + kind);
 				for (const option of pattern) {
 					log(3, 'Attempting to parse alteration: ' + option.kind);
 					const node = parseNode(option.kind, [...parents, kind]);
@@ -121,7 +134,7 @@ export function parse(options: ParseOptions): Node[] {
 						return node;
 					}
 				}
-				log(1, 'Warning: No matches for oneof');
+				log(1, 'Warning: No matches for alternation');
 				return null;
 			}
 			case 'sequence': {
@@ -173,7 +186,7 @@ export function parse(options: ParseOptions): Node[] {
 		}
 	}
 
-	const result: Node[] = [];
+	const nodes: Node[] = [];
 	while (position < tokens.length) {
 		let node: Node | null = null;
 		for (const root of options.rootNodes) {
@@ -185,7 +198,7 @@ export function parse(options: ParseOptions): Node[] {
 			const token = tokens[dirtyPosition || position];
 			throw `Unexpected ${token.kind} "${token.text}" at ${token.line}:${token.column}`;
 		}
-		result.push(node);
+		nodes.push(node);
 	}
-	return result;
+	return nodes;
 }

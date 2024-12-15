@@ -29,7 +29,7 @@
 		},
 		{
 			"name": "term",
-			"type": "oneof",
+			"type": "alternation",
 			"pattern": [
 				{ "kind": "string", "type": "required" },
 				{ "kind": "identifier", "type": "required" },

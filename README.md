@@ -86,7 +86,7 @@ nop               # do nothing
 	definitions: [
 		{
 			name: 'operand',
-			type: 'oneof',
+			type: 'alternation',
 			pattern: ['register', 'immediate', 'number'],
 			// Note using a string for a pattern is a shortcut for { kind: <string>, type: 'required' }
 		},
@@ -113,17 +113,17 @@ nop               # do nothing
 		},
 		{
 			name: 'instruction_list_start',
-			type: 'oneof',
+			type: 'alternation',
 			pattern: ['instruction', 'comment'],
 		},
 		{
 			name: 'instruction_list_continue',
-			type: 'oneof',
+			type: 'alternation',
 			pattern: ['line_terminator', 'instruction', 'comment'],
 		},
 		{
 			name: 'instruction_list',
-			type: 'oneof',
+			type: 'alternation',
 			pattern: [
 				{ kind: 'instruction_list_start', type: 'required' },
 				{ kind: 'instruction_list_continue', type: 'repeated' },
@@ -244,14 +244,11 @@ operand = register | immediate | number;
 # commas are used for items in sequence. Braces indicate repetition
 operand_list = operand, {",", operand};
 
-# brackets are optional items
+# brackets are optional items, parenthesis are used for normal groups
 instruction	= identifier, [operand_list];
 
-# parenthesis are used for normal groups
-instruction_list = (instruction | comment), {line_terminator, instruction | comment};
-
-# the `root` directive tells xcompile what the root element of the AST is
-##root instruction_list
+# the `root` directive tells xcompile what the root element of the AST are
+##root instruction
 
 ```
 
