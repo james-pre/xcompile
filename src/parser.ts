@@ -72,7 +72,9 @@ export function parse(options: ParseOptions): Node[] {
 	const max_cycles = options.maxCycles ?? 5;
 	const id = options.id;
 
-	if (id) parseInfo.set(id, { parseNodeCalls: 0, nodesParsed: 0, ignoredLiterals: 0 });
+	const info: ParseInfo = { parseNodeCalls: 0, nodesParsed: 0, ignoredLiterals: 0 };
+
+	if (id) parseInfo.set(id, info);
 
 	let position = 0,
 		dirtyPosition = 0;
@@ -83,7 +85,7 @@ export function parse(options: ParseOptions): Node[] {
 
 	for (let i = 0; i < raw_tokens.length; i++) {
 		if (!options.ignoreLiterals.includes(raw_tokens[i].kind)) tokens.push(raw_tokens[i]);
-		else if (id) parseInfo.get(id)!.ignoredLiterals++;
+		else if (id) info.ignoredLiterals++;
 	}
 
 	const literals = 'tokens' in options ? options.literals : [...options.literals].map(literal => literal.name);
@@ -91,7 +93,7 @@ export function parse(options: ParseOptions): Node[] {
 	const attempts = new Map<string, Node | null>();
 
 	function parseNode(kind: string, parents: string[] = []): Node | null {
-		if (id) parseInfo.get(id)!.parseNodeCalls++;
+		if (id) info.parseNodeCalls++;
 
 		const depth = parents.length;
 
@@ -120,7 +122,7 @@ export function parse(options: ParseOptions): Node[] {
 			throw `Possible infinite loop: ${loop.join(' -> ')} -> ... at ${node.line}:${node.column}`;
 		}
 
-		if (id) parseInfo.get(id)!.nodesParsed++;
+		if (id) info.nodesParsed++;
 
 		if (literals.includes(kind)) {
 			const token = tokens[position];
