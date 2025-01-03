@@ -45,7 +45,7 @@ if ((options.tokens == 'only' || options.parser == 'only') && (options.format ||
 }
 
 function logger(outputLevel) {
-	return function (level, message, depth) {
+	return function ({ level, message, depth }) {
 		if (outputLevel < level) return;
 
 		console.log(' '.repeat(4 * depth) + (level > 2 ? '[debug] ' : '') + message);

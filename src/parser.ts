@@ -5,9 +5,11 @@ export interface DefinitionPart {
 	type: 'required' | 'optional' | 'repeated';
 }
 
+export type DefinitionType = 'alternation' | 'sequence';
+
 export interface NodeDefinition {
 	name: string;
-	type: 'sequence' | 'alternation';
+	type: DefinitionType;
 	pattern: (string | DefinitionPart)[];
 }
 
@@ -22,7 +24,43 @@ export function stringifyNode(node: Node, depth = 0): string {
 	);
 }
 
-export type Logger = (verbosity: number, message: string, depth: number) => void;
+export interface LogInfo {
+	level: number;
+	message: string;
+	kind: string;
+	depth: number;
+	type?: DefinitionType;
+	event?: 'attempt' | 'resolve' | 'fail' | 'start';
+}
+
+export type Logger = (info: LogInfo) => void;
+
+export function logger(log: Logger | undefined, options: Partial<LogInfo> & Pick<LogInfo, 'kind' | 'depth'>): (level: number, message: string, tags?: string[]) => void {
+	if (!log) return () => {};
+
+	return function (level, message, tags = []) {
+		// parse tags into type and stage
+
+		let type: DefinitionType | undefined, stage: LogInfo['event'] | undefined;
+
+		for (const tag of tags) {
+			switch (tag) {
+				case 'alternation':
+				case 'sequence':
+					type = tag;
+					break;
+				case 'attempt':
+				case 'resolve':
+				case 'fail':
+				case 'start':
+					stage = tag;
+					break;
+			}
+		}
+
+		log({ ...options, level, message, type, event: stage });
+	};
+}
 
 export interface ParseOptionsShared {
 	definitions: NodeDefinition[];
@@ -99,7 +137,7 @@ export function parse(options: ParseOptions): Node[] {
 
 		if (depth >= max_depth) throw 'Max depth exceeded when parsing ' + kind;
 
-		const log = (level: number, message: string): void => options.log?.(level, message, depth);
+		const log = logger(options.log, { kind, depth });
 
 		const attempt = kind + position + (depth == 0 ? '' : parents.at(-1));
 
@@ -151,16 +189,16 @@ export function parse(options: ParseOptions): Node[] {
 
 		switch (definition.type) {
 			case 'alternation': {
-				log(1, 'Parsing alternation: ' + kind);
+				log(1, 'Parsing alternation: ' + kind, ['alternation', 'start']);
 				for (const option of pattern) {
-					log(3, 'Attempting to parse alteration: ' + option.kind);
+					log(3, 'Attempting to parse alteration: ' + option.kind, ['alternation', 'attempt']);
 					const node = parseNode(option.kind, [...parents, kind]);
 					if (node) {
-						log(3, `Resolved ${kind} to ${node.kind}`);
+						log(3, `Resolved ${kind} to ${node.kind}`, ['alternation', 'resolve']);
 						return _cache(node);
 					}
 				}
-				log(1, 'Warning: No matches for alternation');
+				log(1, 'Warning: No matches for alternation', ['alternation', 'fail']);
 				return null;
 			}
 			case 'sequence': {
@@ -169,9 +207,9 @@ export function parse(options: ParseOptions): Node[] {
 				const start = position;
 				const token = tokens[position];
 
-				log(1, 'Parsing sequence: ' + kind);
+				log(1, 'Parsing sequence: ' + kind, ['sequence', 'start']);
 				for (const part of pattern) {
-					log(3, 'Attempting to parse sequence part: ' + part.kind);
+					log(3, 'Attempting to parse sequence part: ' + part.kind, ['sequence', 'attempt']);
 					if (part.type == 'repeated') {
 						let repeatedNode: Node | null;
 						while ((repeatedNode = parseNode(part.kind, [...parents, kind]))) {
@@ -183,16 +221,16 @@ export function parse(options: ParseOptions): Node[] {
 					dirtyPosition = position;
 					const node = parseNode(part.kind, [...parents, kind]);
 					if (node) {
-						log(2, `Parsed ${node.kind} at ${node.line}:${node.column}`);
+						log(2, `Parsed ${node.kind} at ${node.line}:${node.column}`, ['sequence']);
 						children.push(node);
 					} else if (part.type != 'optional') {
-						log(2, `Failed to parse "${part.kind}", going back`);
+						log(2, `Failed to parse "${part.kind}", going back`, ['sequence', 'fail']);
 						position = start; // Rollback
 						return null;
 					}
 				}
 
-				log(1, `"${token.kind}" at ${token.line}:${token.column}`);
+				log(1, `"${token.kind}" at ${token.line}:${token.column}`, ['sequence', 'resolve']);
 				return _cache({
 					kind,
 					text: token.text,

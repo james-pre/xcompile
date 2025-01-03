@@ -8,7 +8,7 @@
 	"keywords": [],
 	"bin": {
 		"xcompile-bnf": "scripts/bnf.js",
-		"xcompile-dump-ast": "scripts/ast.js"
+		"xcompile-dump": "scripts/dump.js"
 	},
 	"files": [
 		"dist",

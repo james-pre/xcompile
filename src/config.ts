@@ -21,6 +21,6 @@ export interface Config {
 export function parseJSON(config: Json): Config {
 	return {
 		...config,
-		literals: config.literals.map(literal => ({ name: literal.name, pattern: new RegExp('^' + literal.pattern) })),
+		literals: config.literals.map(literal => ({ name: literal.name, pattern: new RegExp('^(' + literal.pattern + ')') })),
 	};
 }

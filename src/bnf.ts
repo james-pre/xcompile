@@ -1,7 +1,7 @@
 import rawConfig from './bnf.json' with { type: 'json' };
 import * as config from './config.js';
 import type { DefinitionPart, Logger, Node, NodeDefinition } from './parser.js';
-import { parse } from './parser.js';
+import { logger, parse } from './parser.js';
 import type { Token, TokenDefinition } from './tokens.js';
 import { tokenize } from './tokens.js';
 
@@ -42,7 +42,8 @@ export function ast_to_config(ast: Node[], log: Logger = () => {}): config.Confi
 		groups = 0;
 
 	function processNode(node: Node, depth: number = 0) {
-		const _log = (level: number, text: string) => log(level, text, depth);
+		const _log = logger(log, { kind: node.kind, depth });
+
 		_log(3, `Processing ${node.kind} at ${node.line}:${node.column}`);
 
 		if (node.kind == 'directive') {
@@ -122,7 +123,9 @@ export function ast_to_config(ast: Node[], log: Logger = () => {}): config.Confi
 
 	function processExpression(expression: Node, depth: number = 0): [DefinitionPart[], boolean] {
 		let isAlternation = false;
-		const _log = (level: number, text: string) => log(level, text, depth);
+
+		const _log = logger(log, { kind: expression.kind, depth });
+
 		const pattern: DefinitionPart[] = [];
 
 		for (const term of expression.children || []) {
