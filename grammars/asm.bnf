@@ -12,8 +12,8 @@ comment         = "#.*";
 
 operand = register | immediate | number;
 
-operand_list = operand, {",", operand};
+operand_list = operand {",", operand};
 
-instruction	= identifier, operand_list?;
+instruction	= identifier operand_list?;
 
 ##root instruction
