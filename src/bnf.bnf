@@ -5,6 +5,7 @@ whitespace      = '[ \t]+';
 line_terminator	= "\n+";
 comment         = "#(?!#)([^\n]*)";
 directive       = "##\w+ [^\n]*";
+comma           = ',';
 
 # Simplifies internals
 
@@ -16,19 +17,19 @@ right_bracket = '\]';
 left_brace = '\{';
 right_brace = '\}';
 
-##ignore whitespace comment line_terminator
+##ignore whitespace comment line_terminator comma
 
 # groups
-parenthesized = left_paren, expression, right_paren;
-optional = (left_bracket, expression, right_bracket) | (identifier, '\?');
-repetition = (left_brace, expression, right_brace) | (identifier, '\*');
+parenthesized = left_paren expression right_paren;
+optional = (left_bracket expression right_bracket) | (identifier '\?');
+repetition = (left_brace expression right_brace) | (identifier '\*');
 
 term = parenthesized | optional | repetition | string | identifier;
 
 # TODO: Make this non-recursive. ATM this breaks the parser.
-sequence = term, {',', term};
-expression = sequence, {pipe, sequence};
+sequence = term*;
+expression = sequence {pipe sequence};
 
-rule = identifier, '=', expression, ';';
+rule = identifier '=' expression ';';
 
 ##root rule directive

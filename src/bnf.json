@@ -70,22 +70,7 @@
 				{ "kind": "identifier", "type": "required" }
 			]
 		},
-		{
-			"name": "sequence#0",
-			"type": "sequence",
-			"pattern": [
-				{ "kind": ",", "type": "required" },
-				{ "kind": "term", "type": "required" }
-			]
-		},
-		{
-			"name": "sequence",
-			"type": "sequence",
-			"pattern": [
-				{ "kind": "term", "type": "required" },
-				{ "kind": "sequence#0", "type": "repeated" }
-			]
-		},
+		{ "name": "sequence", "type": "sequence", "pattern": [{ "kind": "term", "type": "repeated" }] },
 		{
 			"name": "expression#0",
 			"type": "sequence",
@@ -120,6 +105,7 @@
 		{ "name": "line_terminator", "pattern": "\\n+" },
 		{ "name": "comment", "pattern": "#(?!#)([^\\n]*)" },
 		{ "name": "directive", "pattern": "##\\w+ [^\\n]*" },
+		{ "name": "comma", "pattern": "," },
 		{ "name": "pipe", "pattern": "\\|" },
 		{ "name": "left_paren", "pattern": "\\(" },
 		{ "name": "right_paren", "pattern": "\\)" },
@@ -129,10 +115,9 @@
 		{ "name": "right_brace", "pattern": "\\}" },
 		{ "name": "\\?", "pattern": "\\?" },
 		{ "name": "\\*", "pattern": "\\*" },
-		{ "name": ",", "pattern": "," },
 		{ "name": "=", "pattern": "=" },
 		{ "name": ";", "pattern": ";" }
 	],
 	"rootNodes": ["rule", "directive"],
-	"ignoreLiterals": ["whitespace", "comment", "line_terminator"]
+	"ignoreLiterals": ["whitespace", "comment", "line_terminator", "comma"]
 }

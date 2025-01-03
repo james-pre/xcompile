@@ -153,10 +153,7 @@ export function ast_to_config(ast: Node[], log: Logger = () => {}): config.Confi
 				_log(2, 'Sequence has no children');
 				continue;
 			}
-			for (let factor of term.children) {
-				if (factor.kind == 'sequence_continue' || factor.kind == 'sequence#0') {
-					factor = factor.children![1];
-				}
+			for (const factor of term.children) {
 				const node = factor.children?.[0] ?? factor;
 
 				_log(2, `Parsing ${node.kind} "${node.text}" at ${node.line}:${node.column}`);
