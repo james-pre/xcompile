@@ -20,10 +20,10 @@ right_brace = '\}';
 
 # groups
 parenthesized = left_paren, expression, right_paren;
-optional = left_bracket, expression, right_bracket;
-repetition = left_brace, expression, right_brace;
+optional = (left_bracket, expression, right_bracket) | (identifier, '\?');
+repetition = (left_brace, expression, right_brace) | (identifier, '\*');
 
-term = string | identifier | parenthesized | optional | repetition;
+term = parenthesized | optional | repetition | string | identifier;
 
 # TODO: Make this non-recursive. ATM this breaks the parser.
 sequence = term, {',', term};

@@ -10,7 +10,7 @@
 			]
 		},
 		{
-			"name": "optional",
+			"name": "optional#0",
 			"type": "sequence",
 			"pattern": [
 				{ "kind": "left_bracket", "type": "required" },
@@ -19,7 +19,23 @@
 			]
 		},
 		{
-			"name": "repetition",
+			"name": "optional#1",
+			"type": "sequence",
+			"pattern": [
+				{ "kind": "identifier", "type": "required" },
+				{ "kind": "\\?", "type": "required" }
+			]
+		},
+		{
+			"name": "optional",
+			"type": "alternation",
+			"pattern": [
+				{ "kind": "optional#0", "type": "required" },
+				{ "kind": "optional#1", "type": "required" }
+			]
+		},
+		{
+			"name": "repetition#0",
 			"type": "sequence",
 			"pattern": [
 				{ "kind": "left_brace", "type": "required" },
@@ -28,14 +44,30 @@
 			]
 		},
 		{
+			"name": "repetition#1",
+			"type": "sequence",
+			"pattern": [
+				{ "kind": "identifier", "type": "required" },
+				{ "kind": "\\*", "type": "required" }
+			]
+		},
+		{
+			"name": "repetition",
+			"type": "alternation",
+			"pattern": [
+				{ "kind": "repetition#0", "type": "required" },
+				{ "kind": "repetition#1", "type": "required" }
+			]
+		},
+		{
 			"name": "term",
 			"type": "alternation",
 			"pattern": [
-				{ "kind": "string", "type": "required" },
-				{ "kind": "identifier", "type": "required" },
 				{ "kind": "parenthesized", "type": "required" },
 				{ "kind": "optional", "type": "required" },
-				{ "kind": "repetition", "type": "required" }
+				{ "kind": "repetition", "type": "required" },
+				{ "kind": "string", "type": "required" },
+				{ "kind": "identifier", "type": "required" }
 			]
 		},
 		{
@@ -95,6 +127,8 @@
 		{ "name": "right_bracket", "pattern": "\\]" },
 		{ "name": "left_brace", "pattern": "\\{" },
 		{ "name": "right_brace", "pattern": "\\}" },
+		{ "name": "\\?", "pattern": "\\?" },
+		{ "name": "\\*", "pattern": "\\*" },
 		{ "name": ",", "pattern": "," },
 		{ "name": "=", "pattern": "=" },
 		{ "name": ";", "pattern": ";" }

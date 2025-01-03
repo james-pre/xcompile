@@ -1,36 +1,40 @@
 # C Language BNF
 # Probably not stable.
 
-identifier         = '[a-zA-Z_][a-zA-Z_0-9]*';
-number             = '(0[xX][0-9a-fA-F]+|\d+)';
+comment            = '//.*|/\*[^*]*(\*[^/][^*]*)*\*/';
+whitespace         = '\s+';
+directive          = '#[^\n]*';
 string_literal     = '"([^"\\]|\\.)*"';
 character_literal  = '\'([^\\]|\\.)\'';
-whitespace         = '\s+';
-comment            = '//.*|/\*[^*]*(\*[^/][^*]*)*\*/';
-directive          = '#[^\n]*';
+number             = '(0[xX][0-9a-fA-F]+|\d+)';
+
+type_namespace = 'enum' | 'struct' | 'union';
+type_keyword = 'long' | 'short' | 'signed' | 'unsigned';
+storage_specifier = 'register' | 'static';
+
+identifier         = '[a-zA-Z_]\w*';
 
 left_paren  = '\(';
 right_paren = '\)';
+left_bracket = '\[';
+right_bracket = '\]';
 
-##ignore whitespace comment directive
+##ignore comment whitespace
 
 # Keywords
 
-type_namespace = 'enum' | 'struct' | 'union';
 
-type_keyword = 'long' | 'short' | 'signed' | 'unsigned';
-
-storage_specifier = 'inline' | 'register' | 'static';
 
 keyword = type_keyword | type_namespace | storage_specifier | 'break' | 'case' | 'continue' | 'default' | 'do' | 'else' | 'for' | 'goto' | 'if' | 'return' | 'sizeof' | 'switch' | 'typedef' | 'void' | 'while';
 
 # Operators and punctuation
-math_only_operator = '\+\+|--|\+|-|/|%|<<|>>|<|<=|>|>=|==|!=|&|\||\^|\!|~|&&|\|\|';
+access_operator = '\.|->';
+math_only_operator = '\+\+|--|\+|-|/|%|<<|>>|<|<=|>|>=|==|!=|&&|\|\||&|\||\^|\!|~';
 ptr_or_mul = '\*';
 math_operator = ptr_or_mul | math_only_operator;
 assignment_operator = '\+=|-=|\*=|/=|%=|<<=|>>=|&=|\|=|\^=';
 
-operator = math_operator | assignment_operator | '=' | '\?|:' | ',' | ';' | left_paren | right_paren | '\[|\]';
+operator = math_operator | assignment_operator | access_operator | '=' | '\?|:' | ',' | ';' | left_paren | right_paren | left_bracket | right_bracket;
 
 # Expressions
 nested_expression = left_paren, expression, right_paren;
@@ -55,17 +59,29 @@ constant_expression = number | character_literal | (left_paren, constant_express
 
 
 # Declarations
-declaration = type_specifier, declarator;
 
-full_declaration = ['extern'], declaration, ['=', initializer], ';';
+base_type = (type_namespace, identifier) | ([type_keyword], (identifier | type_keyword)) | 'void';
 
-type_specifier =  ['const' | 'volatile'], [type_keyword | type_namespace], identifier;
+type_specifier =  ['const' | 'volatile'], [storage_specifier], base_type;
 
-declarator = {ptr_or_mul}, identifier, ['\[', [number], '\]'];
+declarator = {ptr_or_mul}, identifier, [left_bracket, [number], right_bracket];
+
+declaration = type_specifier, declarator, {identifier};
+
+full_declaration = ['extern'], (function_delcaration | declaration, ['=', initializer]), ';';
+
+function_delcaration = type_specifier, declarator, left_paren, [declaration, {',', declaration}], right_paren;
+
+named_initializer = ('.', identifier | left_bracket, identifier, right_bracket), '=', initializer;
+
+record_initializer_list = named_initializer, {',', named_initializer};
+
+initializer_list = initializer, {',', initializer} | record_initializer_list;
 
 initializer = expression | '\{', initializer_list, '\}';
 
-initializer_list = initializer, {',', initializer};
+
+
 
 # Statements
 statement =  expression_statement
@@ -89,9 +105,9 @@ iteration_statement = ('while', left_paren, expression, right_paren, statement)
 
 jump_statement = 'goto', identifier, ';' | 'continue', ';' | 'break', ';' | 'return', [expression], ';';
 
-function_definition = type_specifier, declarator, left_paren, [declaration, {',', declaration}], right_paren, compound_statement;
+function_definition = function_delcaration, compound_statement;
 
 # Translation Unit
 translation_unit = full_declaration | function_definition;
 
-##root translation_unit
+##root translation_unit directive

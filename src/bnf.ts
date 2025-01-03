@@ -148,9 +148,9 @@ export function ast_to_config(ast: Node[], log: Logger = () => {}): config.Confi
 				continue;
 			}
 
-			_log(2, `Parsing term at ${term.line}:${term.column}`);
+			_log(2, `Parsing sequence at ${term.line}:${term.column}`);
 			if (!term.children?.length) {
-				_log(2, 'Term has no children');
+				_log(2, 'Sequence has no children');
 				continue;
 			}
 			for (let factor of term.children) {
@@ -177,9 +177,11 @@ export function ast_to_config(ast: Node[], log: Logger = () => {}): config.Confi
 						pattern.push({ kind: text, type: 'required' });
 						break;
 					}
-					case 'identifier':
-						pattern.push({ kind: node.text, type: 'required' });
+					case 'identifier': {
+						const modifer = factor.children?.[1]?.kind;
+						pattern.push({ kind: node.text, type: modifer == '\\?' ? 'optional' : modifer == '\\*' ? 'repeated' : 'required' });
 						break;
+					}
 					case 'left_bracket':
 					case 'left_brace':
 					case 'left_paren': {
