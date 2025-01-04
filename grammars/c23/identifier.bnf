@@ -1,0 +1,17 @@
+# Identifier
+
+identifier = identifier_start identifier_continue*;
+
+identifier_start = nondigit;
+#| XID_Start character
+#| universal_character_name of class XID_Start
+
+identifier_continue = digit | nondigit;
+#| XID_Continue character
+#| universal_character_name of class XID_Continue
+
+nondigit = "[_a-zA-Z]";
+
+digit = "[0-9]";
+
+sign = "\+|-";

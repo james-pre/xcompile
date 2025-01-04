@@ -1,0 +1,22 @@
+
+comment = "\/\/[^\n]*|\/\*[\s\S]*?\*\/";
+whitespace = '\s+';
+
+##ignore comment whitespace
+
+# String and character constants
+
+# Due to comments handling, we need to have a literal for the entire character constant
+__c_chars = "'([^'\\\n]|\\['\"\\?abfnrtv]|\\[0-7]{1,3}|\\x[0-9A-Fa-f]+|\\u[0-9A-Fa-f]{4}|\\U[0-9A-Fa-f]{8})*'";
+
+character_constant = encoding_prefix? __c_chars;
+
+__s_chars = '"([^"\\\n]|\\["\'\\?abfnrtv]|\\[0-7]{1,3}|\\x[0-9A-Fa-f]+|\\u[0-9A-Fa-f]{4}|\\U[0-9A-Fa-f]{8})*"';
+
+string_literal = encoding_prefix? __s_chars;
+
+encoding_prefix = "u8|u|U|L";
+
+# Misc.
+
+quote = "'";

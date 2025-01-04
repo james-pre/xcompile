@@ -1,4 +1,4 @@
-
+##include common.bnf
 
 token =
 | keyword
@@ -6,19 +6,6 @@ token =
 | constant 
 | string_literal 
 | punctuator;
-
-__pp_token_base =
-| header_name
-| identifier
-| pp_number 
-| character_constant
-| string_literal;
-
-preprocessing_token = __pp_token_base | punctuator;
-#| each universal_character_name that cannot be one of the above 
-#| each non_white_space character that cannot be one of the above
-
-quote = "'";
 
 keyword = "alignas" | "alignof" | "auto" | "bool"
 | "break" | "case" | "char"
@@ -45,20 +32,7 @@ keyword = "alignas" | "alignof" | "auto" | "bool"
 | "_Imaginary"
 | "_Noreturn";
 
-
-identifier = identifier_start identifier_continue*;
-
-identifier_start = nondigit;
-#| XID_Start character
-#| universal_character_name of class XID_Start
-
-identifier_continue = digit | nondigit;
-#| XID_Continue character
-#| universal_character_name of class XID_Continue
- 
-nondigit = "[_a-zA-Z]";
-
-digit = "[0-9]";
+##include identifier.bnf
 
 universal_character_name = "\\u" hex_quad | "\\U" hex_quad hex_quad;
 
@@ -124,8 +98,6 @@ fractional_constant =
 
 exponent_part = "e|E" sign? digit_sequence;
 
-sign = "\+|-";
-
 digit_sequence = digit | (digit_sequence quote? digit);
 
 hexadecimal_fractional_constant = hexadecimal_digit_sequence? "\." hexadecimal_digit_sequence;
@@ -136,72 +108,9 @@ floating_suffix = "f|l|df|dd|dl|F|L|DF|DD|DL";
 
 enumeration_constant = identifier;
 
-character_constant = encoding_prefix? quote c_char_sequence quote;
-
-encoding_prefix = "u8|u|U|L";
-
-c_char_sequence = c_char*;
-
-c_char = 
-| "[^'\n\\]" # any member of the source character set except the single_quote ', backslash \, or new_line character
-| escape_sequence; 
-
-escape_sequence =
-| simple_escape_sequence 
-| octal_escape_sequence 
-| hexadecimal_escape_sequence 
-| universal_character_name;
-
-simple_escape_sequence = "\\['\"\?\\abfnrtv]";
-
-octal_escape_sequence = "\\" octal_digit octal_digit? octal_digit?;
-
-hexadecimal_escape_sequence = "\\x" hexadecimal_digit hexadecimal_digit*;
-
 predefined_constant = "false" | "true" | "nullptr";
 
-string_literal = encoding_prefix? '"' s_char_sequence? '"';
-
-s_char_sequence = s_char*;
-
-s_char =
-| "[^\"\n\\]" # any member of the source character set except the double_quote ", backslash \, or new_line character
-| escape_sequence;
-
-# `punctuator` minus things used later (e.g. "any pp-token other than ...")
-__punctuator_base = "\." | "->"
-| "\+\+" | "--" | "&" | "\*" | "\+" | "-" | "~" | "!"
-| "/" | "%" | "==" | "!=" | "\^" | "\|" | "&&" | "\|\|" | "\?" | ":" | "::" | ";" | "\.\.\."
-| "=" | "\*=" | "/=" | "%=" | "\+=" | "-=" | "&=" | "\^=" | "\|="
-| "," | "#" | "##"
-| "%:" | "%:%:";
-
-__punctuator_angle_brackets = "<<" | ">>" | "<" | ">" | "<=" | ">=" | "<<=" | ">>=" | "<:" | ":>" | "<%" | "%>";
-__punctuator_grouping = "\[" | "\]" | "\(" | "\)" | "\{" | "\}";
-
-punctuator =  __punctuator_base | __punctuator_angle_brackets | __punctuator_grouping;
-
-header_name =
-| ("<" h_char_sequence ">")
-| ('"' q_char_sequence '"');
-
-h_char_sequence = h_char*;
-
-# any member of the source character set except the new_line character and >
-h_char = "[^\n>]";
-
-q_char_sequence = q_char*;
-
-# any member of the source character set except the new_line character and "
-q_char = "[^\n\"]";
-
-pp_number =
-| (["\."] digit)
-| (pp_number identifier_continue)
-| (pp_number quote digit)
-| (pp_number quote nondigit)
-| (pp_number "e|E|p|P" sign)
-| (pp_number "\.");
+##include punctuator.bnf
 
 primary_expression =
 | identifier
@@ -526,145 +435,14 @@ iteration_statement =
 
 jump_statement = (("goto" identifier) | "continue" | "break" | ("return" expression?)) ";";
 
-translation_unit = external_declaration*;
+##root translation_unit
+translation_unit = external_declaration;
 
 external_declaration = function_definition | declaration;
 
 function_definition = attribute_specifier_sequence? declaration_specifiers declarator function_body;
 
 function_body = compound_statement;
-
-preprocessing_file = group?;
-
-group = group_part*;
-
-group_part =
-| if_section 
-| control_line
-| text_line 
-| ("#" non_directive);
-
-if_section = if_group elif_groups? else_group? endif_line;
-
-if_group =
-| ("#" "if" constant_expression new_line group?)
-| ("#" "ifdef" identifier new_line group? "#" ifndef identifier new_line group?);
-
-elif_groups = elif_group*;
-
-elif_group =
-| ("#" "elif" constant_expression new_line group?)
-| ("#" "elifdef" identifier new_line group?)
-| ("#" "elifndef" identifier new_line group?);
-
-else_group = "#" "else" new_line group?;
-
-endif_line = "#" "endif" new_line;
-
-control_line = "#" [
-| ("include" pp_tokens)
-| ("embed" pp_tokens)
-| ("define" identifier replacement_list)
-| ("define" identifier lparen identifier_list? "\)" replacement_list)
-| ("define" identifier lparen "\.\.\." "\)" replacement_list)
-| ("define" identifier lparen identifier_list "," "\.\.\." "\)" replacement_list)
-| ("undef" identifier)
-| ("line" pp_tokens)
-| ("error" pp_tokens?)
-| ("warning" pp_tokens?)
-| ("pragma" pp_tokens?)
-] new_line;
-
-text_line = pp_tokens? new_line;
-
-non_directive = pp_tokens new_line;
-
-# a ( character not immediately preceded by white space
-# TODO: Actually do a look-behind
-lparen = "\(";
-  
-replacement_list = pp_tokens?;
-
-pp_tokens = preprocessing_token*;
-
-# the new_line character
-new_line = "\n";
-
-identifier_list = identifier {"," identifier};
-
-pp_parameter = pp_parameter_name pp_parameter_clause?;
-
-pp_parameter_name = pp_standard_parameter | pp_prefixed_parameter;
-
-pp_standard_parameter = identifier;
-
-pp_prefixed_parameter = identifier "::" identifier;
-
-pp_parameter_clause = "\(" pp_balanced_token_sequence? "\)";
-
-pp_balanced_token_sequence = pp_balanced_token*;
-
-pp_balanced_token =
-| ("\(" pp_balanced_token_sequence? "\)")
-| ("\[" pp_balanced_token_sequence? "\]")
-| ("\{" pp_balanced_token_sequence? "\}")
-| __pp_token_no_grouping;
-
-# any pp_token other than a parenthesis, a bracket, or a brace
-__pp_token_no_grouping =
-| __pp_token_base
-| __punctuator_base
-| __punctuator_angle_brackets;
-
-embed_parameter_sequence = pp_parameter*;
-
-defined_macro_expression = "defined" (identifier | ("\(" identifier "\)"));
-
-# any preprocessing_token other than >
-h_preprocessing_token = 
-| __pp_token_base
-| __punctuator_base
-| __punctuator_grouping;
-
-h_pp_tokens = h_preprocessing_token*;
-
-header_name_tokens = string_literal | ("<" h_pp_tokens ">");
-
-has_include_expression = "__has_include" "\(" (header_name | header_name_tokens) "\)";
-
-has_embed_expression =
-| ("__has_embed" "\(" (header_name embed_parameter_sequence?) "\)")
-| ("__has_embed" "\(" (header_name_tokens pp_balanced_token_sequence?) "\)");
-
-has_c_attribute_express = "__has_c_attribute" "\(" pp_tokens "\)";
-
-va_opt_replacement = "__VA_OPT__" "\(" pp_tokens? "\)";
-
-standard_pragma = "#" "pragma" "STDC" (
-| ("FP_CONTRACT" on_off_switch)
-| ("FENV_ACCESS" on_off_switch)
-| ("FENV_DEC_ROUND" dec_direction)
-| ("FENV_ROUND" direction)
-| ("CX_LIMITED_RANGE" on_off_switch)
-);
-
-on_off_switch = "ON" | "OFF" | "DEFAULT";
-
-direction =
-| "FE_DOWNWARD"
-| "FE_TONEAREST"
-| "FE_TONEARESTFROMZERO" 
-| "FE_TOWARDZERO"
-| "FE_UPWARD"
-| "FE_DYNAMIC";
-
-dec_direction =
-| "FE_DEC_DOWNWARD"
-| "FE_DEC_TONEAREST"
-| "FE_DEC_TONEARESTFROMZERO" 
-| "FE_DEC_TOWARDZERO"
-| "FE_DEC_UPWARD"
-| "FE_DEC_DYNAMIC";
 
 n_char_sequence = {digit | nondigit};
 n_wchar_sequence = {digit | nondigit};
