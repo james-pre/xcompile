@@ -5,7 +5,7 @@ import { logger, parse } from './parser.js';
 import type { Token, TokenDefinition } from './tokens.js';
 import { tokenize } from './tokens.js';
 
-export const { literals, definitions, ignoreLiterals, rootNodes } = config.parseJSON(rawConfig as config.Json);
+export const { literals, definitions, ignoreLiterals, rootNodes } = config.parse_json(rawConfig as config.Json);
 
 /**
  * Shortcut for tokenize(source, bnf.literals);

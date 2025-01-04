@@ -2,9 +2,10 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { inspect, parseArgs } from 'node:util';
 import * as bnf from '../dist/bnf.js';
-import { stringifyNode } from '../dist/parser.js';
+import { stringify_node } from '../dist/parser.js';
+import { is_issue, stringify_issue } from '../dist/issue.js';
 import { dirname, resolve } from 'node:path/posix';
-import { compress as compressConfig } from '../dist/config.js';
+import { compress as compress_config } from '../dist/config.js';
 
 const {
 	positionals: [input],
@@ -66,28 +67,19 @@ try {
 	process.exit(1);
 }
 
-const token_error_reasons = {
-	unexpected: 'Unexpected token',
-};
-
 let tokens;
 try {
 	tokens = bnf.tokenize(contents);
 } catch (e) {
-	if (!('reason' in e)) throw e;
+	if (!is_issue(e)) throw e;
 
-	const { line, column, position, source, reason } = e;
-
-	console.error(`${input}:${line}:${column}
-${source.split('\n')[line - 1]}
-${' '.repeat(column)}^
-Error: ${token_error_reasons[reason]}: ${source[position]}`);
+	console.error(stringify_issue(e));
 	process.exit(1);
 }
 
 if (options.tokens) {
 	for (const token of tokens) {
-		console.log(stringifyNode(token));
+		console.log(stringify_node(token));
 	}
 	if (options.tokens == 'only') process.exit(0);
 }
@@ -98,7 +90,7 @@ const ast = bnf.parse(tokens, parseLogger);
 
 if (options.ast) {
 	for (const node of ast) {
-		console.log(stringifyNode(node));
+		console.log(stringify_node(node));
 	}
 	if (options.parser == 'only') process.exit(0);
 }
@@ -116,7 +108,7 @@ function include(path) {
 
 let config = bnf.ast_to_config(ast, logger(verbose), include);
 
-if (options.compress) config = compressConfig(config);
+if (options.compress) config = compress_config(config);
 
 const write = data => (options.output ? writeFileSync(options.output, data) : console.log);
 

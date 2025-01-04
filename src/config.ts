@@ -21,7 +21,7 @@ export interface Config {
 	ignoreLiterals: string[];
 }
 
-export function parseLiteral(literal: TokenDefinitionJSON): TokenDefinition {
+export function parse_json_literal(literal: TokenDefinitionJSON): TokenDefinition {
 	const $ = literal.pattern.endsWith('$');
 
 	if ($) literal.pattern = literal.pattern.slice(0, -1);
@@ -35,10 +35,10 @@ export function parseLiteral(literal: TokenDefinitionJSON): TokenDefinition {
 /**
  * Parses a JSON configuration into a normal configuration
  */
-export function parseJSON(config: Json): Config {
+export function parse_json(config: Json): Config {
 	return {
 		...config,
-		literals: config.literals.map(parseLiteral),
+		literals: config.literals.map(parse_json_literal),
 	};
 }
 

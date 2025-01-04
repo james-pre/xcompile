@@ -1,3 +1,4 @@
+import type { IssueLevel, SourceIssue } from './issue.js';
 import { tokenize, type Token, type TokenDefinition } from './tokens.js';
 
 export interface DefinitionPart {
@@ -23,10 +24,10 @@ export interface Node extends Token {
 	children?: Node[];
 }
 
-export function stringifyNode(node: Node, depth = 0): string {
+export function stringify_node(node: Node, depth = 0): string {
 	return (
 		`${node.kind}${node?.children?.length ? '' : ` "${node.text.replaceAll('\n', '\\n').replaceAll('\t', '\\t')}"`} ${node.line}:${node.column}` +
-		(node?.children?.map(child => '\n' + '    '.repeat(depth + 1) + stringifyNode(child, depth + 1)).join('') || '')
+		(node?.children?.map(child => '\n' + '    '.repeat(depth + 1) + stringify_node(child, depth + 1)).join('') || '')
 	);
 }
 
@@ -76,6 +77,7 @@ export interface ParseOptionsShared {
 	maxCycles?: number;
 	log?: Logger;
 	id?: string;
+	source?: string;
 }
 
 export interface ParseAndTokenize extends ParseOptionsShared {
@@ -109,7 +111,7 @@ interface ParseInfo {
 	ignoredLiterals: number;
 }
 
-export const parseInfo = new Map<string, ParseInfo>();
+export const parse_info = new Map<string, ParseInfo>();
 
 export function parse(options: ParseOptions): Node[] {
 	const max_depth = options.maxNodeDepth ?? 100;
@@ -118,12 +120,14 @@ export function parse(options: ParseOptions): Node[] {
 
 	const info: ParseInfo = { parseNodeCalls: 0, nodesParsed: 0, ignoredLiterals: 0 };
 
-	if (id) parseInfo.set(id, info);
+	if (id) parse_info.set(id, info);
 
 	let position = 0,
 		dirtyPosition = 0;
 
 	const raw_tokens = 'tokens' in options ? options.tokens : tokenize(options.source, options.literals);
+
+	const source = options.source ?? raw_tokens.map(token => token.text).join('');
 
 	const tokens: Token[] = [];
 
@@ -136,12 +140,17 @@ export function parse(options: ParseOptions): Node[] {
 
 	const attempts = new Map<string, Node | null>();
 
+	function parseIssue(level: IssueLevel, message?: string): SourceIssue {
+		const token = tokens[position];
+		return { id, line: token.line, column: token.column, position: token.position, source, level, message };
+	}
+
 	function parseNode(kind: string, parents: string[] = []): Node | null {
 		if (id) info.parseNodeCalls++;
 
 		const depth = parents.length;
 
-		if (depth >= max_depth) throw 'Max depth exceeded when parsing ' + kind;
+		if (depth >= max_depth) throw parseIssue(0, 'Max depth exceeded while parsing ' + kind);
 
 		const log = logger(options.log, { kind, depth });
 
@@ -162,8 +171,7 @@ export function parse(options: ParseOptions): Node[] {
 		const loop = find_loop(parents, max_cycles);
 
 		if (loop) {
-			const node = tokens[position];
-			throw `Possible infinite loop: ${loop.join(' -> ')} -> ... at ${node.line}:${node.column}`;
+			throw parseIssue(0, `Possible infinite loop: ${loop.join(' -> ')} -> ...`);
 		}
 
 		if (id) info.nodesParsed++;
@@ -186,10 +194,7 @@ export function parse(options: ParseOptions): Node[] {
 		}
 
 		const definition = options.definitions.find(def => def.name === kind);
-		if (!definition) {
-			log(1, `Error: Definition for node "${kind}" not found`);
-			throw `Definition for node "${kind}" not found`;
-		}
+		if (!definition) throw parseIssue(0, `Definition for "${kind}" not found`);
 
 		const pattern = definition.pattern.map(part => (typeof part === 'string' ? { kind: part, type: 'required' } : part));
 
@@ -262,7 +267,7 @@ export function parse(options: ParseOptions): Node[] {
 		if (!node) {
 			if (position >= tokens.length && options.ignoreLiterals.includes(tokens.at(-1)!.kind)) break;
 			const token = tokens[dirtyPosition || position];
-			throw `Unexpected ${token.kind} "${token.text}" at ${token.line}:${token.column}`;
+			throw parseIssue(0, 'Unexpected ' + token.kind);
 		}
 		nodes.push(node);
 	}

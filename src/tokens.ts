@@ -1,3 +1,5 @@
+import type { SourceIssue } from './issue.js';
+
 export interface Token {
 	kind: string;
 	text: string;
@@ -9,14 +11,6 @@ export interface Token {
 export interface TokenDefinition {
 	name: string;
 	pattern: RegExp;
-}
-
-export interface TokenError {
-	line: number;
-	column: number;
-	position: number;
-	source: string;
-	reason: string;
 }
 
 export function tokenize(source: string, definitions: Iterable<TokenDefinition>): Token[] {
@@ -38,7 +32,7 @@ export function tokenize(source: string, definitions: Iterable<TokenDefinition>)
 		}
 
 		if (!token) {
-			throw { line, column, position, source, reason: 'unexpected' };
+			throw { line, column, position, source, message: 'Unexpected token: ' + source[position], level: 0 } satisfies SourceIssue;
 		}
 
 		tokens.push(token);

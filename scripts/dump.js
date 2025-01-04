@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 import { readFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
-import { parse, parseInfo, stringifyNode } from '../dist/parser.js';
-import { parseJSON as parseJSONConfig } from '../dist/config.js';
+import { parse, parse_info, stringify_node } from '../dist/parser.js';
+import { parse_json as parseJSONConfig } from '../dist/config.js';
 import { tokenize } from '../dist/tokens.js';
+import { is_issue, stringify_issue } from '../dist/issue.js';
 
 const {
 	values: options,
@@ -91,7 +92,7 @@ if (options.tokens) {
 
 	for (const token of tokens) {
 		if (options.mode != 'all' && config.ignoreLiterals.includes(token.kind)) continue;
-		console.log(stringifyNode(token));
+		console.log(stringify_node(token));
 	}
 
 	process.exit(0);
@@ -100,7 +101,7 @@ if (options.tokens) {
 function dump_info() {
 	if (!options.info) return;
 
-	const info = parseInfo.get(input);
+	const info = parse_info.get(input);
 
 	for (const [k, v] of Object.entries(info)) {
 		console.error(k + ': ', v);
@@ -124,7 +125,7 @@ try {
 	ast = parse({ ...config, tokens, log, id: input });
 	dump_info();
 } catch (e) {
-	console.error('Error: parsing failed:', e);
+	console.error(is_issue(e) ? stringify_issue(e, true) : e.message);
 	dump_info();
 	process.exit(1);
 }
@@ -132,5 +133,5 @@ try {
 if (options.quiet) process.exit(0);
 
 for (const node of ast) {
-	console.log(stringifyNode(node));
+	console.log(stringify_node(node));
 }
