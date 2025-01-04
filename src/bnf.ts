@@ -1,6 +1,6 @@
 import rawConfig from './bnf.json' with { type: 'json' };
 import * as config from './config.js';
-import type { DefinitionPart, Logger, Node, NodeDefinition } from './parser.js';
+import type { DefinitionPart, Logger, Node, PureNodeDefinition } from './parser.js';
 import { logger, parse } from './parser.js';
 import type { Token, TokenDefinition } from './tokens.js';
 import { tokenize } from './tokens.js';
@@ -33,7 +33,7 @@ const typeForGroup = {
 } as const;
 
 export function ast_to_config(ast: Node[], log: Logger = () => {}, include?: (name: string) => Node[]): config.Config {
-	const definitions: NodeDefinition[] = [],
+	const definitions: PureNodeDefinition[] = [],
 		literals: TokenDefinition[] = [],
 		ignoreLiterals: string[] = [],
 		rootNodes: string[] = [];
@@ -66,6 +66,47 @@ export function ast_to_config(ast: Node[], log: Logger = () => {}, include?: (na
 						processNode(node, depth + 1);
 					}
 					break;
+				// ##flags <rule> <flags>
+				case 'flags': {
+					const [, name, flags] = contents.match(/(\w+)\s+(\w+)/) || [];
+					const literal = literals.find(({ name: n }) => n == name);
+					if (!literal) {
+						_log(0, 'Warning: ##flags references missing literal: ' + name);
+						break;
+					}
+
+					literal.pattern = new RegExp(literal.pattern.source, flags);
+
+					break;
+				}
+				// ##groups <rule> <name 0> <name 1> ... <name n>
+				case 'groups': {
+					const [, name, _names] = contents.match(/(\w+)\s+([\s\w]+)/) || [];
+					const groupNames = _names.split(/[\s,]+/);
+					const rule = definitions.find(d => d.name == name);
+					if (!rule) {
+						_log(0, 'Warning: ##groups: missing rule ' + JSON.stringify(name));
+						break;
+					}
+					for (let i = 0; i < groupNames.length; i++) {
+						const group = definitions.find(d => d.name == name + '#' + i);
+
+						if (!group) {
+							_log(0, 'Warning: ##groups: missing group ' + i);
+							break;
+						}
+
+						for (const part of rule.pattern) {
+							if (part.kind == group.name) {
+								part.kind = groupNames[i];
+							}
+						}
+
+						_log(1, `Renaming group: ${group.name} -> ${groupNames[i]}`);
+						group.name = groupNames[i];
+					}
+					break;
+				}
 				default:
 					_log(0, 'Warning: unsupported directive: ' + directive);
 			}
@@ -108,8 +149,9 @@ export function ast_to_config(ast: Node[], log: Logger = () => {}, include?: (na
 		*/
 
 		const maybeLiteral = pattern[0].kind;
-		const index = literals.findIndex(({ name }) => name == maybeLiteral);
-		if (index != -1 && pattern.length == 1 && pattern[0].type == 'required') {
+
+		const index = literals.findIndex(l => l.name == maybeLiteral);
+		if (index != -1 && pattern.length == 1 && pattern[0].type == 'required' && literals[index].pattern.source.slice(1) == pattern[0].kind) {
 			let regex;
 			try {
 				regex = new RegExp('^' + maybeLiteral);
@@ -174,13 +216,16 @@ export function ast_to_config(ast: Node[], log: Logger = () => {}, include?: (na
 						// Remove the surrounding quotes
 						const text = node.text.slice(1, -1).replaceAll('\\' + quote, quote);
 
-						let regex;
 						try {
-							regex = new RegExp('^' + text);
+							const regex = new RegExp('^' + text);
+
+							if (!literals.some(l => l.name == text)) {
+								literals.push({ name: text, pattern: regex });
+							}
 						} catch (e: any) {
 							throw `Invalid literal: ${text}: ${e.message}`;
 						}
-						literals.push({ name: text, pattern: regex });
+
 						pattern.push({ kind: text, type: 'required' });
 						break;
 					}

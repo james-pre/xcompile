@@ -1,13 +1,12 @@
 
 # `punctuator` minus things used later (e.g. "any pp-token other than ...")
-__punctuator_base = "\." | "->"
-| "\+\+" | "--" | "&" | "\*" | "\+" | "-" | "~" | "!"
+__punctuator_base = "\." | "\+\+" | "--" | "&" | "\*" | "\+" | "-" | "~" | "!"
 | "/" | "%" | "==" | "!=" | "\^" | "\|" | "&&" | "\|\|" | "\?" | ":" | "::" | ";" | "\.\.\."
 | "=" | "\*=" | "/=" | "%=" | "\+=" | "-=" | "&=" | "\^=" | "\|="
-| "," | "#" | "##"
-| "%:" | "%:%:";
+| "," | "##" | "%:" | "%:%:";
 
-__punctuator_angle_brackets = "<<" | ">>" | "<" | ">" | "<=" | ">=" | "<<=" | ">>=" | "<:" | ":>" | "<%" | "%>";
+__punctuator_left_angle_brackets = "<<" | "<" | "<=" | "<<=" | "<:" | "<%";
+__punctuator_angle_brackets = __punctuator_left_angle_brackets | ">>" | ">" | ">=" | ">>=" | ":>" | "%>" | "->";
 __punctuator_grouping = "\[" | "\]" | "\(" | "\)" | "\{" | "\}";
 
 punctuator =  __punctuator_base | __punctuator_angle_brackets | __punctuator_grouping;

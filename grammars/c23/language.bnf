@@ -32,11 +32,9 @@ keyword = "alignas" | "alignof" | "auto" | "bool"
 | "_Imaginary"
 | "_Noreturn";
 
-##include identifier.bnf
+universal_character_name = "\\u[0-9a-fA-F]{4}|\\U[0-9a-fA-F]{8}";
 
-universal_character_name = "\\u" hex_quad | "\\U" hex_quad hex_quad;
-
-hex_quad = "[0-9a-fA-F]{4}";
+identifier = "[_a-zA-Z]\w*";
 
 constant =
 | integer_constant 
@@ -49,13 +47,11 @@ integer_constant = (decimal_constant | octal_constant | hexadecimal_constant | b
 
 decimal_constant = nonzero_digit {quote? digit};
 
-octal_constant = "0" {quote? octal_digit};
+octal_constant = "0[0-7]['0-7]+";
 
 hexadecimal_constant = hexadecimal_prefix hexadecimal_digit_sequence;
 
-binary_constant =
-| binary_prefix binary_digit 
-| binary_constant quote? binary_digit;
+binary_constant = binary_prefix binary_digit {quote? binary_digit};
 
 hexadecimal_prefix = "0(x|X)";
 
@@ -63,11 +59,7 @@ binary_prefix = "0(b|B)";
 
 nonzero_digit = "[1-9]";
 
-octal_digit = "[0-7]";
-
-hexadecimal_digit_sequence = hexadecimal_digit {quote? hexadecimal_digit};
-
-hexadecimal_digit = "[0-9a-fA-F]";
+hexadecimal_digit_sequence = "[0-9a-fA-F]['0-9a-fA-F]*";
 
 binary_digit = "0|1";
 
@@ -90,19 +82,17 @@ decimal_floating_constant =
 | (fractional_constant exponent_part? floating_suffix?)  
 | (digit_sequence exponent_part floating_suffix?);
 
-hexadecimal_floating_constant = hexadecimal_prefix (hexadecimal_fractional_constant | hexadecimal_digit_sequence) binary_exponent_part floating_suffix?;
+hexadecimal_floating_constant = hexadecimal_prefix ([hexadecimal_digit_sequence? "\."] hexadecimal_digit_sequence) binary_exponent_part floating_suffix?;
 
 fractional_constant =
 | (digit_sequence? "\." digit_sequence)
 | (digit_sequence "\.");
 
-exponent_part = "e|E" sign? digit_sequence;
+exponent_part = "(e|E)(\+|-)?[0-9]['0-9]*";
 
-digit_sequence = digit | (digit_sequence quote? digit);
+digit_sequence = "[0-9]['0-9]*";
 
-hexadecimal_fractional_constant = hexadecimal_digit_sequence? "\." hexadecimal_digit_sequence;
-
-binary_exponent_part = "p|P" sign? digit_sequence;
+binary_exponent_part = "(p|P)(\+|-)?[0-9]['0-9]*";
 
 floating_suffix = "f|l|df|dd|dl|F|L|DF|DD|DL";
 

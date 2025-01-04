@@ -11,6 +11,14 @@ export interface TokenDefinition {
 	pattern: RegExp;
 }
 
+export interface TokenError {
+	line: number;
+	column: number;
+	position: number;
+	source: string;
+	reason: string;
+}
+
 export function tokenize(source: string, definitions: Iterable<TokenDefinition>): Token[] {
 	const tokens: Token[] = [];
 
@@ -24,14 +32,13 @@ export function tokenize(source: string, definitions: Iterable<TokenDefinition>)
 		if (!slice.length) break;
 		for (const { name, pattern } of definitions) {
 			const match = pattern.exec(slice);
-			if (match) {
+			if (match && match[0].length > (token?.text.length || 0)) {
 				token = { kind: name, text: match[0], line, column, position };
-				break;
 			}
 		}
 
 		if (!token) {
-			throw new Error(`Unexpected token "${source[position]}" at line ${line}, column ${column}`);
+			throw { line, column, position, source, reason: 'unexpected' };
 		}
 
 		tokens.push(token);

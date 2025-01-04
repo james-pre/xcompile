@@ -7,6 +7,12 @@ export interface DefinitionPart {
 
 export type DefinitionType = 'alternation' | 'sequence';
 
+export interface PureNodeDefinition {
+	name: string;
+	type: DefinitionType;
+	pattern: DefinitionPart[];
+}
+
 export interface NodeDefinition {
 	name: string;
 	type: DefinitionType;

@@ -4,6 +4,7 @@ import { inspect, parseArgs } from 'node:util';
 import * as bnf from '../dist/bnf.js';
 import { stringifyNode } from '../dist/parser.js';
 import { dirname, resolve } from 'node:path/posix';
+import { compress as compressConfig } from '../dist/config.js';
 
 const {
 	positionals: [input],
@@ -63,7 +64,24 @@ try {
 	process.exit(1);
 }
 
-const tokens = bnf.tokenize(contents);
+const token_error_reasons = {
+	unexpected: 'Unexpected token',
+};
+
+let tokens;
+try {
+	tokens = bnf.tokenize(contents);
+} catch (e) {
+	if (!('reason' in e)) throw e;
+
+	const { line, column, position, source, reason } = e;
+
+	console.error(`${input}:${line}:${column}
+${source.split('\n')[line - 1]}
+${' '.repeat(column)}^
+Error: ${token_error_reasons[reason]}: ${source[position]}`);
+	process.exit(1);
+}
 
 if (options.tokens) {
 	for (const token of tokens) {
@@ -94,13 +112,27 @@ function include(path) {
 	}
 }
 
-const config = bnf.ast_to_config(ast, logger(verbose), include);
+const config = compressConfig(bnf.ast_to_config(ast, logger(verbose), include));
 
 const write = data => (options.output ? writeFileSync(options.output, data) : console.log);
 
 switch (options.format) {
 	case 'json':
-		write(JSON.stringify(config, (key, value) => (value instanceof RegExp ? value.source.slice(1) : value)));
+		write(
+			JSON.stringify({
+				...config,
+				literals: config.literals.map(literal => {
+					const base = {
+						name: literal.name,
+						pattern: literal.pattern.source,
+					};
+
+					const { flags } = literal.pattern;
+
+					return flags.length ? { ...base, flags } : base;
+				}),
+			})
+		);
 		break;
 	case 'js':
 		write(inspect(config, { colors: options.colors, depth: null }));
