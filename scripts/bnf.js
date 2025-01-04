@@ -86,7 +86,12 @@ if (options.ast) {
 function include(path) {
 	const fullPath = resolve(dirname(input), path);
 
-	return bnf.parse(bnf.tokenize(readFileSync(fullPath, 'utf8')), parseLogger);
+	try {
+		return bnf.parse(bnf.tokenize(readFileSync(fullPath, 'utf8')), parseLogger);
+	} catch (e) {
+		console.error(e.message);
+		process.exit(1);
+	}
 }
 
 const config = bnf.ast_to_config(ast, logger(verbose), include);
