@@ -15,14 +15,14 @@ if_group = "#" (
 | ("ifdef\b" identifier group_part*)
 | ("ifndef\b" identifier group_part*)
 );
-##groups if_group if ifdef ifndef
+##groups if_group %#if %#ifdef %#ifndef
 
 elif_group = "#" (
 | ("elif\b" constant_expression group_part*)
 | ("elifdef\b" identifier group_part*)
 | ("elifndef\b" identifier group_part*)
 );
-##groups elif_group elif elifdef elifndef
+##groups elif_group %#elif %#elifdef %#elifndef
 
 else_group = "#" "else\b" group_part*;
 

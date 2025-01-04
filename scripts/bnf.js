@@ -18,6 +18,7 @@ const {
 		parser: { short: 'P', type: 'string' },
 		verbose: { short: 'V', type: 'boolean', multiple: true },
 		help: { short: 'h', type: 'boolean', default: false },
+		compress: { type: 'boolean', default: false },
 	},
 	allowPositionals: true,
 });
@@ -29,6 +30,7 @@ Output options:
     --output,-o <path>       Path to an output file
     --colors,-c              Colorize output messages
     --help,-h                Display this help message  
+    --compress               Compress the output config
 Debugging options:
     --tokens,-T [only]       Show tokenizer output. If 'only', only the tokenizer output will be shown.
     --parser,-P [only]       Show parser output. If 'only', only the parser output will be shown.
@@ -112,7 +114,9 @@ function include(path) {
 	}
 }
 
-const config = compressConfig(bnf.ast_to_config(ast, logger(verbose), include));
+let config = bnf.ast_to_config(ast, logger(verbose), include);
+
+if (options.compress) config = compressConfig(config);
 
 const write = data => (options.output ? writeFileSync(options.output, data) : console.log);
 

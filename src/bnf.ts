@@ -81,7 +81,7 @@ export function ast_to_config(ast: Node[], log: Logger = () => {}, include?: (na
 				}
 				// ##groups <rule> <name 0> <name 1> ... <name n>
 				case 'groups': {
-					const [, name, _names] = contents.match(/(\w+)\s+([\s\w]+)/) || [];
+					const [, name, _names] = contents.match(/(\w+)\s+(.+)/) || [];
 					const groupNames = _names.split(/[\s,]+/);
 					const rule = definitions.find(d => d.name == name);
 					if (!rule) {
@@ -96,14 +96,16 @@ export function ast_to_config(ast: Node[], log: Logger = () => {}, include?: (na
 							break;
 						}
 
-						for (const part of rule.pattern) {
+						const new_name = groupNames[i].replaceAll('%', name);
+
+						for (const part of definitions.flatMap(d => d.pattern)) {
 							if (part.kind == group.name) {
-								part.kind = groupNames[i];
+								part.kind = new_name;
 							}
 						}
 
-						_log(1, `Renaming group: ${group.name} -> ${groupNames[i]}`);
-						group.name = groupNames[i];
+						_log(1, `Renaming group: ${group.name} -> ${new_name}`);
+						group.name = new_name;
 					}
 					break;
 				}
