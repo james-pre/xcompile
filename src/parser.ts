@@ -126,7 +126,7 @@ export function parse(options: ParseOptions): Node[] {
 		else if (id) info.ignoredLiterals++;
 	}
 
-	const literals = 'tokens' in options ? options.literals : [...options.literals].map(literal => literal.name);
+	const literals = [...options.literals].map(literal => (typeof literal == 'string' ? literal : literal.name));
 
 	const attempts = new Map<string, Node | null>();
 

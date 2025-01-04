@@ -32,7 +32,7 @@ const typeForGroup = {
 	left_paren: 'required',
 } as const;
 
-export function ast_to_config(ast: Node[], log: Logger = () => {}): config.Config {
+export function ast_to_config(ast: Node[], log: Logger = () => {}, include?: (name: string) => Node[]): config.Config {
 	const definitions: NodeDefinition[] = [],
 		literals: TokenDefinition[] = [],
 		ignoreLiterals: string[] = [],
@@ -55,6 +55,16 @@ export function ast_to_config(ast: Node[], log: Logger = () => {}): config.Confi
 					break;
 				case 'ignore':
 					ignoreLiterals.push(...contents.split(/[ ,;]/));
+					break;
+				case 'include':
+					if (!include) {
+						_log(0, 'Warning: Missing include()');
+						break;
+					}
+					_log(1, 'Including: ' + contents);
+					for (const node of include(contents)) {
+						processNode(node, depth + 1);
+					}
 					break;
 				default:
 					_log(0, 'Warning: unsupported directive: ' + directive);

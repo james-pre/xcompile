@@ -3,6 +3,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { inspect, parseArgs } from 'node:util';
 import * as bnf from '../dist/bnf.js';
 import { stringifyNode } from '../dist/parser.js';
+import { dirname, resolve } from 'node:path/posix';
 
 const {
 	positionals: [input],
@@ -71,7 +72,9 @@ if (options.tokens) {
 	if (options.tokens == 'only') process.exit(0);
 }
 
-const ast = bnf.parse(tokens, logger(options.parser ? parseInt(options.parser) : 0));
+const parseLogger = logger(options.parser ? parseInt(options.parser) : 0);
+
+const ast = bnf.parse(tokens, parseLogger);
 
 if (options.ast) {
 	for (const node of ast) {
@@ -80,7 +83,13 @@ if (options.ast) {
 	if (options.parser == 'only') process.exit(0);
 }
 
-const config = bnf.ast_to_config(ast, logger(verbose));
+function include(path) {
+	const fullPath = resolve(dirname(input), path);
+
+	return bnf.parse(bnf.tokenize(readFileSync(fullPath, 'utf8')), parseLogger);
+}
+
+const config = bnf.ast_to_config(ast, logger(verbose), include);
 
 const write = data => (options.output ? writeFileSync(options.output, data) : console.log);
 

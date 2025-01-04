@@ -80,13 +80,13 @@ try {
 	process.exit(1);
 }
 
+const tokens = tokenize(source, config.literals);
+
+if (options.info) {
+	console.error('Tokens:', tokens.length);
+}
+
 if (options.tokens) {
-	const tokens = tokenize(source, config.literals);
-
-	if (options.info) {
-		console.error('Tokens:', tokens.length);
-	}
-
 	if (options.quiet) process.exit(0);
 
 	for (const token of tokens) {
@@ -121,7 +121,7 @@ function log(info) {
 
 let ast;
 try {
-	ast = parse({ ...config, source, log, id: input });
+	ast = parse({ ...config, tokens, log, id: input });
 	dump_info();
 } catch (e) {
 	console.error('Error: parsing failed:', e);

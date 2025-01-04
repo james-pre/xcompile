@@ -20,8 +20,10 @@ export function tokenize(source: string, definitions: Iterable<TokenDefinition>)
 
 	while (position < source.length) {
 		let token: Token | undefined;
+		const slice = source.slice(position);
+		if (!slice.length) break;
 		for (const { name, pattern } of definitions) {
-			const match = pattern.exec(source.slice(position));
+			const match = pattern.exec(slice);
 			if (match) {
 				token = { kind: name, text: match[0], line, column, position };
 				break;
