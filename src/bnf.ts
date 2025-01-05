@@ -308,12 +308,11 @@ function config_process_rule($: CreateConfigContext, rule: Node): void {
 		if (attr_value) {
 			const [, { kind, text }] = attr_value.children!;
 
-			value =
-				kind == 'string'
-					? JSON.parse(text)
-					: kind == 'number'
-						? parseFloat(text)
-						: ($.logger(attr_value)[1](1, 'Using identifiers for attribute values is not support yet (value set to null)'), null);
+			if (kind == 'identifier') {
+				$.logger(attr_value)[1](1, 'Using identifiers for attribute values is not supported yet (value set to null)');
+			}
+
+			value = kind == 'string' ? JSON.parse(text) : kind == 'number' ? parseFloat(text) : null;
 		}
 
 		attributes[attr_id.text] = value;
