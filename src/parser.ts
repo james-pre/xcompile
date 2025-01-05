@@ -1,5 +1,7 @@
+import type { Common as CommonConfig } from './config.js';
 import type { IssueLevel, SourceIssue } from './issue.js';
-import { tokenize, type Token, type TokenDefinition } from './tokens.js';
+import type { Token, TokenDefinition } from './tokens.js';
+import { tokenize } from './tokens.js';
 
 export interface DefinitionPart {
 	kind: string;
@@ -69,10 +71,8 @@ export function logger(log: Logger | undefined, options: Partial<LogInfo> & Pick
 	};
 }
 
-export interface ParseOptionsShared {
+export interface ParseOptionsShared extends CommonConfig {
 	definitions: NodeDefinition[];
-	rootNodes: string[];
-	ignoreLiterals: string[];
 	maxNodeDepth?: number;
 	maxCycles?: number;
 	log?: Logger;
@@ -132,7 +132,7 @@ export function parse(options: ParseOptions): Node[] {
 	const tokens: Token[] = [];
 
 	for (let i = 0; i < raw_tokens.length; i++) {
-		if (!options.ignoreLiterals.includes(raw_tokens[i].kind)) tokens.push(raw_tokens[i]);
+		if (!options.ignored_literals.includes(raw_tokens[i].kind)) tokens.push(raw_tokens[i]);
 		else if (id) info.ignoredLiterals++;
 	}
 
@@ -261,12 +261,12 @@ export function parse(options: ParseOptions): Node[] {
 	const nodes: Node[] = [];
 	while (position < tokens.length) {
 		let node: Node | null = null;
-		for (const root of options.rootNodes) {
+		for (const root of options.root_nodes) {
 			node = parseNode(root);
 			if (node) break;
 		}
 		if (!node) {
-			if (position >= tokens.length && options.ignoreLiterals.includes(tokens.at(-1)!.kind)) break;
+			if (position >= tokens.length && options.ignored_literals.includes(tokens.at(-1)!.kind)) break;
 			const token = tokens[dirtyPosition || position];
 			throw _issue(0, 'Unexpected ' + token.kind);
 		}

@@ -128,6 +128,6 @@
 		{ "name": "=", "pattern": "=" },
 		{ "name": ";", "pattern": ";" }
 	],
-	"rootNodes": ["rule", "directive"],
-	"ignoreLiterals": ["whitespace", "comment", "line_terminator", "comma"]
+	"root_nodes": ["rule", "directive"],
+	"ignored_literals": ["whitespace", "comment", "line_terminator", "comma"]
 }

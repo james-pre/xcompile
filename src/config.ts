@@ -7,25 +7,27 @@ export interface TokenDefinitionJSON {
 	flags?: string;
 }
 
-export interface Json {
+/**
+ * Shared between different config formats
+ */
+export interface Common {
+	root_nodes: string[];
+	ignored_literals: string[];
+}
+
+export interface Json extends Common {
 	literals: TokenDefinitionJSON[];
 	definitions: NodeDefinition[];
-	rootNodes: string[];
-	ignoreLiterals: string[];
 }
 
-export interface Config {
+export interface Config extends Common {
 	literals: TokenDefinition[];
 	definitions: NodeDefinition[];
-	rootNodes: string[];
-	ignoreLiterals: string[];
 }
 
-export interface PureConfig {
+export interface PureConfig extends Common {
 	literals: TokenDefinition[];
 	definitions: PureNodeDefinition[];
-	rootNodes: string[];
-	ignoreLiterals: string[];
 }
 
 export function parse_json_literal(literal: TokenDefinitionJSON): TokenDefinition {

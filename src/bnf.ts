@@ -41,9 +41,26 @@ export interface ASTConfigOptions {
 }
 
 interface ASTConfigContext extends ASTConfigOptions {
+	/**
+	 * The current depth
+	 */
 	depth: number;
+
+	/**
+	 * The config being created
+	 */
 	config: PureConfig;
-	currentNode?: string;
+
+	/**
+	 * The name of the rule currently being parsed.
+	 * Used for group names.
+	 */
+	currentRule?: string;
+
+	/**
+	 * The number of groups in the current rule.
+	 * Used for group names.
+	 */
 	groups: number;
 }
 
@@ -63,12 +80,15 @@ function config_process_directive(text: string, $: ASTConfigContext) {
 	const [, directive, contents] = text.match(/##(\w+) (.*)/i)!;
 
 	switch (directive) {
+		// ##ignore <rules...>
 		case 'root':
-			$.config.rootNodes.push(...contents.split(/[ ,;]/));
+			$.config.root_nodes.push(...contents.split(/[ ,;]/));
 			break;
+		// ##ignore <rules...>
 		case 'ignore':
-			$.config.ignoreLiterals.push(...contents.split(/[ ,;]/));
+			$.config.ignored_literals.push(...contents.split(/[ ,;]/));
 			break;
+		// ##include <file.bnf>
 		case 'include':
 			if (!$.include) {
 				log(0, 'Warning: Missing include()');
@@ -92,7 +112,7 @@ function config_process_directive(text: string, $: ASTConfigContext) {
 
 			break;
 		}
-		// ##groups <rule> <name 0> <name 1> ... <name n>
+		// ##groups <rule> <names...>
 		case 'groups': {
 			const [, name, _names] = contents.match(/(\w+)\s+(.+)/) || [];
 			const groupNames = _names.split(/[\s,]+/);
@@ -210,7 +230,7 @@ function config_process_expression(expression: Node, $: ASTConfigContext): [Defi
 						break;
 					}
 
-					const subName = `${$.currentNode}#${$.groups++}`;
+					const subName = `${$.currentRule}#${$.groups++}`;
 
 					$.config.definitions.push({
 						name: subName,
@@ -234,21 +254,21 @@ function config_process_expression(expression: Node, $: ASTConfigContext): [Defi
 }
 
 function config_process_node(node: Node, $: ASTConfigContext) {
-	const _sub_context = child_context($);
+	const _sub = child_context($);
 
-	const _log = logger($.log, { kind: node.kind, depth: $.depth });
+	const log = logger($.log, { kind: node.kind, depth: $.depth });
 
-	_log(3, `Processing ${node.kind} at ${node.line}:${node.column}`);
+	log(3, `Processing ${node.kind} at ${node.line}:${node.column}`);
 
 	switch (node.kind) {
 		case 'directive':
-			config_process_directive(node.text, _sub_context);
+			config_process_directive(node.text, _sub);
 	}
 
 	if (node.kind != 'rule') {
 		// Recursively process child nodes
 		for (const child of node.children || []) {
-			config_process_node(child, _sub_context);
+			config_process_node(child, _sub);
 		}
 		return;
 	}
@@ -257,16 +277,16 @@ function config_process_node(node: Node, $: ASTConfigContext) {
 	const name = node.children?.find(child => child.kind === 'identifier')?.text;
 	const expression = node.children?.find(child => child.kind === 'expression');
 
-	_log(2, `Found rule "${name}" at ${node.line}:${node.column}`);
+	log(2, `Found rule "${name}" at ${node.line}:${node.column}`);
 	if (!name || !expression) {
-		_log(1, 'Rule is missing name or expression');
+		log(1, 'Rule is missing name or expression');
 		return;
 	}
 
-	$.currentNode = name;
+	$.currentRule = name;
 	$.groups = 0;
 
-	const [pattern, isAlternation] = config_process_expression(expression, _sub_context);
+	const [pattern, isAlternation] = config_process_expression(expression, _sub);
 
 	/*
 		Inline single-use literals
@@ -308,21 +328,23 @@ export function create_config(ast: Node[], options: ASTConfigOptions): Config {
 	const config: PureConfig = {
 		definitions: [],
 		literals: [],
-		rootNodes: [],
-		ignoreLiterals: [],
+		root_nodes: [],
+		ignored_literals: [],
+	};
+
+	const context = {
+		...options,
+		depth: 0,
+		config,
+		groups: 0,
 	};
 
 	// Start processing from the root node
 	for (const node of ast) {
-		config_process_node(node, {
-			...options,
-			depth: 0,
-			config,
-			groups: 0,
-		});
+		config_process_node(node, context);
 	}
 
-	if (!config.rootNodes) {
+	if (!config.root_nodes) {
 		throw 'Missing root node';
 	}
 
