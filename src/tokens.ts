@@ -32,7 +32,7 @@ export function tokenize(source: string, definitions: Iterable<TokenDefinition>)
 		}
 
 		if (!token) {
-			throw { line, column, position, source, message: 'Unexpected token: ' + source[position], level: 0 } satisfies SourceIssue;
+			throw { line, column, position, source, message: 'Unexpected token: ' + source[position], level: 0, stack: new Error().stack } satisfies SourceIssue;
 		}
 
 		tokens.push(token);

@@ -21,6 +21,7 @@ const {
 		tokens: { short: 'T', type: 'boolean', default: false },
 		mode: { short: 'm', type: 'string', default: 'normal' },
 		debug: { short: 'D', type: 'string', multiple: true, default: [] },
+		trace: { type: 'boolean' },
 	},
 	allowPositionals: true,
 });
@@ -37,7 +38,8 @@ Options:
     --quiet,-q           Don't output the AST
     --info,-I            Output parser info
     --verbose,-V         Show verbose output. If passed multiple times, increases the verbosity level
-	--debug,-D <option>  Controls debug output when parsing
+    --trace              Show issue origin trace
+    --debug,-D <option>  Controls debug output when parsing
                              depth: Set the maximum depth to output
                              kind: Only output nodes of the given kind
     --help,-h            Display this help message`);
@@ -48,6 +50,8 @@ if (options.ast && options.tokens) {
 	console.error('Error: Cannot use --ast with --tokens');
 	process.exit(1);
 }
+
+const { trace } = options;
 
 const verbosity = options.verbose?.filter(Boolean)?.length ?? 0;
 
@@ -81,7 +85,13 @@ try {
 	process.exit(1);
 }
 
-const tokens = tokenize(source, config.literals);
+let tokens;
+try {
+	tokens = tokenize(source, config.literals);
+} catch (e) {
+	console.error(is_issue(e) ? stringify_issue(e, { colors: true, trace }) : e.message);
+	process.exit(1);
+}
 
 if (options.info) {
 	console.error('Tokens:', tokens.length);
@@ -125,7 +135,7 @@ try {
 	ast = parse({ ...config, tokens, log, id: input });
 	dump_info();
 } catch (e) {
-	console.error(is_issue(e) ? stringify_issue(e, true) : e.message);
+	console.error(is_issue(e) ? stringify_issue(e, { colors: true, trace }) : e.message);
 	dump_info();
 	process.exit(1);
 }

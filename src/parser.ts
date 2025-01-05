@@ -140,9 +140,10 @@ export function parse(options: ParseOptions): Node[] {
 
 	const attempts = new Map<string, Node | null>();
 
-	function parseIssue(level: IssueLevel, message?: string): SourceIssue {
+	function _issue(level: IssueLevel, message?: string): SourceIssue {
 		const token = tokens[position];
-		return { id, line: token.line, column: token.column, position: token.position, source, level, message };
+		const { stack } = new Error();
+		return { id, line: token.line, column: token.column, position: token.position, source, level, message, stack };
 	}
 
 	function parseNode(kind: string, parents: string[] = []): Node | null {
@@ -150,7 +151,7 @@ export function parse(options: ParseOptions): Node[] {
 
 		const depth = parents.length;
 
-		if (depth >= max_depth) throw parseIssue(0, 'Max depth exceeded while parsing ' + kind);
+		if (depth >= max_depth) throw _issue(0, 'Max depth exceeded while parsing ' + kind);
 
 		const log = logger(options.log, { kind, depth });
 
@@ -171,7 +172,7 @@ export function parse(options: ParseOptions): Node[] {
 		const loop = find_loop(parents, max_cycles);
 
 		if (loop) {
-			throw parseIssue(0, `Possible infinite loop: ${loop.join(' -> ')} -> ...`);
+			throw _issue(0, `Possible infinite loop: ${loop.join(' -> ')} -> ...`);
 		}
 
 		if (id) info.nodesParsed++;
@@ -194,7 +195,7 @@ export function parse(options: ParseOptions): Node[] {
 		}
 
 		const definition = options.definitions.find(def => def.name === kind);
-		if (!definition) throw parseIssue(0, `Definition for "${kind}" not found`);
+		if (!definition) throw _issue(0, `Definition for "${kind}" not found`);
 
 		const pattern = definition.pattern.map(part => (typeof part === 'string' ? { kind: part, type: 'required' } : part));
 
@@ -267,7 +268,7 @@ export function parse(options: ParseOptions): Node[] {
 		if (!node) {
 			if (position >= tokens.length && options.ignoreLiterals.includes(tokens.at(-1)!.kind)) break;
 			const token = tokens[dirtyPosition || position];
-			throw parseIssue(0, 'Unexpected ' + token.kind);
+			throw _issue(0, 'Unexpected ' + token.kind);
 		}
 		nodes.push(node);
 	}

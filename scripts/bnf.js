@@ -20,6 +20,7 @@ const {
 		verbose: { short: 'V', type: 'boolean', multiple: true },
 		help: { short: 'h', type: 'boolean', default: false },
 		compress: { type: 'boolean', default: false },
+		trace: { type: 'boolean' },
 	},
 	allowPositionals: true,
 });
@@ -35,7 +36,8 @@ Output options:
 Debugging options:
     --tokens,-T [only]       Show tokenizer output. If 'only', only the tokenizer output will be shown.
     --parser,-P [only]       Show parser output. If 'only', only the parser output will be shown.
-    --verbose,-V             Show verbose output. If passed multiple times, increases the verbosity level.`);
+    --verbose,-V             Show verbose output. If passed multiple times, increases the verbosity level.
+    --trace                  Show issue origin trace`);
 	process.exit(0);
 }
 
@@ -71,9 +73,7 @@ let tokens;
 try {
 	tokens = bnf.tokenize(contents);
 } catch (e) {
-	if (!is_issue(e)) throw e;
-
-	console.error(stringify_issue(e));
+	console.error(is_issue(e) ? stringify_issue(e, options) : e.message);
 	process.exit(1);
 }
 
@@ -86,7 +86,13 @@ if (options.tokens) {
 
 const parseLogger = logger(options.parser ? parseInt(options.parser) : 0);
 
-const ast = bnf.parse(tokens, parseLogger);
+let ast;
+try {
+	ast = bnf.parse(tokens, parseLogger);
+} catch (e) {
+	console.error(is_issue(e) ? stringify_issue(e, options) : e.message);
+	process.exit(1);
+}
 
 if (options.ast) {
 	for (const node of ast) {
@@ -101,7 +107,7 @@ function include(path) {
 	try {
 		return bnf.parse(bnf.tokenize(readFileSync(fullPath, 'utf8')), parseLogger);
 	} catch (e) {
-		console.error(e.message);
+		console.error(is_issue(e) ? stringify_issue(e, options) : e.message);
 		process.exit(1);
 	}
 }
