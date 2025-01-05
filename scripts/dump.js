@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 import { readFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
-import { parse, parse_info, stringify_node } from '../dist/parser.js';
-import { parse_json as parse_json_config } from '../dist/config.js';
-import { tokenize } from '../dist/tokens.js';
-import { is_issue, stringify_issue } from '../dist/issue.js';
+import { parse, parseInfo, stringifyNode } from '../dist/parser.js';
+import { parseJSON as parseConfigJSON } from '../dist/config.js';
+import { stringifyToken, tokenize } from '../dist/tokens.js';
+import { isIssue, stringifyIssue } from '../dist/issue.js';
 
 const {
 	values: options,
@@ -69,7 +69,7 @@ for (const rawOption of options.debug) {
 
 let config;
 try {
-	config = parse_json_config(JSON.parse(readFileSync(options.config, 'utf-8')));
+	config = parseConfigJSON(JSON.parse(readFileSync(options.config, 'utf-8')));
 } catch (e) {
 	if ('errno' in e) console.error(e);
 	else console.error('Failed to resolve config:', e);
@@ -89,7 +89,7 @@ let tokens;
 try {
 	tokens = tokenize(source, config.literals, input);
 } catch (e) {
-	console.error(is_issue(e) ? stringify_issue(e, { colors: true, trace }) : e.message);
+	console.error(isIssue(e) ? stringifyIssue(e, { colors: true, trace }) : e.message);
 	process.exit(1);
 }
 
@@ -102,7 +102,7 @@ if (options.tokens) {
 
 	for (const token of tokens) {
 		if (options.mode != 'all' && config.ignored_literals.includes(token.kind)) continue;
-		console.log(stringify_node(token));
+		console.log(stringifyToken(token));
 	}
 
 	process.exit(0);
@@ -111,7 +111,7 @@ if (options.tokens) {
 function dump_info() {
 	if (!options.info) return;
 
-	const info = parse_info.get(input);
+	const info = parseInfo.get(input);
 
 	for (const [k, v] of Object.entries(info)) {
 		console.error(k + ': ', v);
@@ -135,7 +135,7 @@ try {
 	ast = parse({ ...config, tokens, log, id: input });
 	dump_info();
 } catch (e) {
-	console.error(is_issue(e) ? stringify_issue(e, { colors: true, trace }) : e.message);
+	console.error(isIssue(e) ? stringifyIssue(e, { colors: true, trace }) : e.message);
 	dump_info();
 	process.exit(1);
 }
@@ -143,5 +143,5 @@ try {
 if (options.quiet) process.exit(0);
 
 for (const node of ast.nodes) {
-	console.log(stringify_node(node));
+	console.log(stringifyNode(node));
 }

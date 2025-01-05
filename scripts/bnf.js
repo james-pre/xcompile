@@ -2,10 +2,11 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 import * as bnf from '../dist/bnf.js';
-import { stringify_node } from '../dist/parser.js';
-import { is_issue, stringify_issue } from '../dist/issue.js';
+import { stringifyNode } from '../dist/parser.js';
+import { isIssue, stringifyIssue } from '../dist/issue.js';
 import { dirname, parse, resolve } from 'node:path/posix';
-import { compress as compress_config } from '../dist/config.js';
+import { compress as compressConfig } from '../dist/config.js';
+import { stringifyToken } from '../dist/tokens.js';
 
 const {
 	positionals: [input],
@@ -55,8 +56,8 @@ const depth_indentation = parseInt(options['visual-depth']) || 0;
 
 function logger(outputLevel) {
 	return function __log(entry) {
-		if (is_issue(entry)) {
-			console.error(stringify_issue(entry, options));
+		if (isIssue(entry)) {
+			console.error(stringifyIssue(entry, options));
 			return;
 		}
 
@@ -86,13 +87,13 @@ let tokens;
 try {
 	tokens = bnf.tokenize(contents, input);
 } catch (e) {
-	console.error(is_issue(e) ? stringify_issue(e, options) : e.message);
+	console.error(isIssue(e) ? stringifyIssue(e, options) : e.message);
 	process.exit(1);
 }
 
 if (options.tokens) {
 	for (const token of tokens) {
-		console.log(stringify_node(token));
+		console.log(stringifyToken(token));
 	}
 	if (options.tokens == 'only') process.exit(0);
 }
@@ -103,13 +104,13 @@ let ast;
 try {
 	ast = bnf.parse(tokens, parseLogger);
 } catch (e) {
-	console.error(is_issue(e) ? stringify_issue(e, options) : e.message);
+	console.error(isIssue(e) ? stringifyIssue(e, options) : e.message);
 	process.exit(1);
 }
 
 if (options.ast) {
 	for (const node of ast) {
-		console.log(stringify_node(node));
+		console.log(stringifyNode(node));
 	}
 	if (options.parser == 'only') process.exit(0);
 }
@@ -120,14 +121,14 @@ function include(path) {
 	try {
 		return bnf.parse(bnf.tokenize(readFileSync(fullPath, 'utf8')), parseLogger);
 	} catch (e) {
-		console.error(is_issue(e) ? stringify_issue(e, options) : e.message);
+		console.error(isIssue(e) ? stringifyIssue(e, options) : e.message);
 		process.exit(1);
 	}
 }
 
-let config = bnf.create_config(ast, { log: logger(verbose), include, id: input });
+let config = bnf.createConfig(ast, { log: logger(verbose), include, id: input });
 
-if (options.compress) config = compress_config(config);
+if (options.compress) config = compressConfig(config);
 
 writeFileSync(
 	options.output || parse(input).name + '.json',

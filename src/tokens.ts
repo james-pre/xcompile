@@ -13,13 +13,19 @@ export interface Location {
 	unit?: string;
 }
 
-export function location_text(loc: Location): string {
+export function locationText(loc: Location): string {
 	return `${loc.unit ? loc.unit + ':' : ''}${loc.line}:${loc.column}`;
 }
 
 export interface Token extends Location {
 	kind: string;
 	text: string;
+}
+
+export function stringifyToken(token: Token) {
+	const text = token.text.replaceAll('\n', '\\n').replaceAll('\t', '\\t');
+
+	return `${token.kind} "${text}" (${locationText(token)})`;
 }
 
 export interface TokenDefinition {

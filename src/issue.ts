@@ -1,4 +1,4 @@
-import { location_text, type Location } from './tokens.js';
+import { locationText, type Location } from './tokens.js';
 
 export interface Issue {
 	location?: Location;
@@ -23,7 +23,7 @@ const colors = {
 	[IssueLevel.Note]: 36,
 };
 
-function extract_trace(stack: string = ''): string {
+function extractTrace(stack: string = ''): string {
 	for (const line of stack.split('\n').map(l => l.trim())) {
 		if (!line.startsWith('at ')) continue;
 		const [, symbol] = line.split(' ');
@@ -36,7 +36,7 @@ function extract_trace(stack: string = ''): string {
 	return '(unknown origin)';
 }
 
-export function is_issue(i: unknown): i is Issue {
+export function isIssue(i: unknown): i is Issue {
 	return typeof i == 'object' && i != null && 'source' in i && 'level' in i;
 }
 
@@ -45,27 +45,27 @@ export interface IssueFormatting {
 	trace: boolean;
 }
 
-export function stringify_issue(i: Issue, options: Partial<IssueFormatting>): string {
+export function stringifyIssue(i: Issue, options: Partial<IssueFormatting>): string {
 	const level = options.colors ? `\x1b[1;${colors[i.level]}m${IssueLevel[i.level]}\x1b[0m` : IssueLevel[i.level];
 
-	const trace = options.trace ? ' ' + extract_trace(i.stack) : '';
+	const trace = options.trace ? ' ' + extractTrace(i.stack) : '';
 
-	const base_message = `${level}: ${i.message}${trace}`;
+	const message = `${level}: ${i.message}${trace}`;
 
-	if (!i.location) return base_message;
+	if (!i.location) return message;
 
-	const line_text = i.source.split('\n')[i.location.line - 1];
+	const lineText = i.source.split('\n')[i.location.line - 1];
 
 	let { column } = i.location,
-		excerpt = line_text;
+		excerpt = lineText;
 
 	// Max 80 chars, 40 before and 40 after
 
-	if (line_text.length > 80) {
+	if (lineText.length > 80) {
 		const offset = Math.max(0, column - 40);
-		excerpt = line_text.slice(offset, column + 40);
+		excerpt = lineText.slice(offset, column + 40);
 		column -= offset;
 	}
 
-	return `${location_text(i.location)}\n\t${excerpt}\n\t${' '.repeat(column)}^\n${base_message}`;
+	return `${locationText(i.location)}\n\t${excerpt}\n\t${' '.repeat(column)}^\n${message}`;
 }

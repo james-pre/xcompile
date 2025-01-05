@@ -30,7 +30,7 @@ export interface PureConfig extends Common {
 	definitions: PureNodeDefinition[];
 }
 
-export function parse_json_literal(literal: TokenDefinitionJSON): TokenDefinition {
+export function parseJSONLiteral(literal: TokenDefinitionJSON): TokenDefinition {
 	const $ = literal.pattern.endsWith('$');
 
 	if ($) literal.pattern = literal.pattern.slice(0, -1);
@@ -44,10 +44,10 @@ export function parse_json_literal(literal: TokenDefinitionJSON): TokenDefinitio
 /**
  * Parses a JSON configuration into a normal configuration
  */
-export function parse_json(config: Json): Config {
+export function parseJSON(config: Json): Config {
 	return {
 		...config,
-		literals: config.literals.map(parse_json_literal),
+		literals: config.literals.map(parseJSONLiteral),
 	};
 }
 

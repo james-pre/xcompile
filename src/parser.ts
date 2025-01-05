@@ -1,7 +1,7 @@
 import type { Common as CommonConfig } from './config.js';
-import { type IssueLevel, type Issue, is_issue } from './issue.js';
+import { type Issue, type IssueLevel, isIssue } from './issue.js';
 import type { Token, TokenDefinition } from './tokens.js';
-import { tokenize } from './tokens.js';
+import { stringifyToken, tokenize } from './tokens.js';
 
 export interface DefinitionPart {
 	kind: string;
@@ -26,14 +26,17 @@ export interface PureNodeDefinition extends NodeDefinition {
 }
 
 export interface Node extends Token {
-	children?: Node[];
+	children: Node[];
 }
 
-export function stringify_node(node: Node, depth = 0): string {
-	return (
-		`${node.kind}${node?.children?.length ? '' : ` "${node.text.replaceAll('\n', '\\n').replaceAll('\t', '\\t')}"`} ${node.line}:${node.column}` +
-		(node?.children?.map(child => '\n' + '    '.repeat(depth + 1) + stringify_node(child, depth + 1)).join('') || '')
-	);
+export function stringifyNode(node: Node, depth = 0): string {
+	if (!node.children.length) return stringifyToken(node);
+
+	depth++;
+
+	const stringifyChild = (child: Node) => '\n' + '\t'.repeat(depth) + stringifyNode(child, depth);
+
+	return node.kind + node?.children.map(stringifyChild).join('');
 }
 
 export interface LogInfo {
@@ -55,7 +58,7 @@ export function logger(log: LogFn | undefined, options: Partial<LogInfo> & Pick<
 	function __log__(level: number, message: string, tags?: string[]): void;
 	function __log__(issue: Issue): void;
 	function __log__(level: number | Issue, message: string = '<unknown>', tags: string[] = []): void {
-		if (is_issue(level)) {
+		if (isIssue(level)) {
 			log!(level);
 			return;
 		}
@@ -106,7 +109,7 @@ export interface ParseOnly extends ParseOptionsShared {
 
 export type ParseOptions = ParseOnly | ParseAndTokenize;
 
-function find_loop(strings: string[], counts: number): string[] | null {
+function findLoop(strings: string[], counts: number): string[] | null {
 	const subArrayCounts: Map<string, number> = new Map();
 
 	for (let i = 0; i < strings.length - 1; i++) {
@@ -125,7 +128,7 @@ interface ParseInfo {
 	ignoredLiterals: number;
 }
 
-export const parse_info = new Map<string, ParseInfo>();
+export const parseInfo = new Map<string, ParseInfo>();
 
 export interface AST {
 	nodes: Node[];
@@ -133,25 +136,25 @@ export interface AST {
 }
 
 export function parse(options: ParseOptions): AST {
-	const max_depth = options.maxNodeDepth ?? 100;
-	const max_cycles = options.maxCycles ?? 5;
+	const maxDepth = options.maxNodeDepth ?? 100;
+	const maxCycles = options.maxCycles ?? 5;
 	const id = options.id;
 
 	const info: ParseInfo = { parseNodeCalls: 0, nodesParsed: 0, ignoredLiterals: 0 };
 
-	if (id) parse_info.set(id, info);
+	if (id) parseInfo.set(id, info);
 
 	let position = 0,
 		dirtyPosition = 0;
 
-	const raw_tokens = 'tokens' in options ? options.tokens : tokenize(options.source, options.literals, id);
+	const rawTokens = 'tokens' in options ? options.tokens : tokenize(options.source, options.literals, id);
 
-	const source = options.source ?? raw_tokens.map(token => token.text).join('');
+	const source = options.source ?? rawTokens.map(token => token.text).join('');
 
 	const tokens: Token[] = [];
 
-	for (let i = 0; i < raw_tokens.length; i++) {
-		if (!options.ignored_literals.includes(raw_tokens[i].kind)) tokens.push(raw_tokens[i]);
+	for (let i = 0; i < rawTokens.length; i++) {
+		if (!options.ignored_literals.includes(rawTokens[i].kind)) tokens.push(rawTokens[i]);
 		else if (id) info.ignoredLiterals++;
 	}
 
@@ -170,7 +173,7 @@ export function parse(options: ParseOptions): AST {
 
 		const depth = parents.length;
 
-		if (depth >= max_depth) throw _issue(0, 'Max depth exceeded while parsing ' + kind);
+		if (depth >= maxDepth) throw _issue(0, 'Max depth exceeded while parsing ' + kind);
 
 		const log = logger(options.log, { kind, depth });
 
@@ -181,14 +184,14 @@ export function parse(options: ParseOptions): AST {
 			return node;
 		};
 
-		if (attempts.has(attempt) && find_loop(parents, 3)) {
+		if (attempts.has(attempt) && findLoop(parents, 3)) {
 			log(3, `Already parsed ${kind} at ${position}`);
 			return attempts.get(attempt) ?? null;
 		}
 
 		_cache(null);
 
-		const loop = find_loop(parents, max_cycles);
+		const loop = findLoop(parents, maxCycles);
 
 		if (loop) {
 			throw _issue(0, `Possible infinite loop: ${loop.join(' -> ')} -> ...`);
@@ -263,11 +266,8 @@ export function parse(options: ParseOptions): AST {
 
 				log(1, `"${token.kind}" at ${token.line}:${token.column}`, ['sequence', 'resolve']);
 				return _cache({
+					...token,
 					kind,
-					text: token.text,
-					position: token.position,
-					line: token.line,
-					column: token.column,
 					children,
 				});
 			}
