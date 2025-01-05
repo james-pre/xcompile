@@ -1,8 +1,7 @@
+import type { Location } from './tokens.js';
+
 export interface Issue {
-	id?: string;
-	line: number;
-	column: number;
-	position: number;
+	location?: Location;
 	source: string;
 	message?: string;
 	level: IssueLevel;
@@ -35,7 +34,7 @@ function extract_location(stack: string = ''): string {
 }
 
 export function is_issue(i: unknown): i is Issue {
-	return typeof i == 'object' && i != null && 'line' in i && 'column' in i && 'position' in i && 'source' in i && 'level' in i;
+	return typeof i == 'object' && i != null && 'source' in i && 'level' in i;
 }
 
 export interface IssueFormatting {
@@ -48,9 +47,13 @@ export function stringify_issue(i: Issue, options: Partial<IssueFormatting>): st
 
 	const trace = options.trace ? ' ' + extract_location(i.stack) : '';
 
-	const line_text = i.source.split('\n')[i.line - 1];
+	const base_message = `${level}: ${i.message}${trace}`;
 
-	let { column } = i,
+	if (!i.location) return base_message;
+
+	const line_text = i.source.split('\n')[i.location.line - 1];
+
+	let { column } = i.location,
 		excerpt = line_text;
 
 	// Max 80 chars, 40 before and 40 after
@@ -61,5 +64,5 @@ export function stringify_issue(i: Issue, options: Partial<IssueFormatting>): st
 		column -= offset;
 	}
 
-	return `${i.id ? i.id + ':' : ''}${i.line}:${column}\n\t${excerpt}\n\t${' '.repeat(column)}^\n${level}: ${i.message}${trace}`;
+	return `${i.location.unit ? i.location.unit + ':' : ''}${i.location.line}:${column}\n\t${excerpt}\n\t${' '.repeat(column)}^\n${base_message}`;
 }

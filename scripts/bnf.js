@@ -84,7 +84,7 @@ try {
 
 let tokens;
 try {
-	tokens = bnf.tokenize(contents);
+	tokens = bnf.tokenize(contents, input);
 } catch (e) {
 	console.error(is_issue(e) ? stringify_issue(e, options) : e.message);
 	process.exit(1);
@@ -125,7 +125,7 @@ function include(path) {
 	}
 }
 
-let config = bnf.create_config(ast, { log: logger(verbose), include });
+let config = bnf.create_config(ast, { log: logger(verbose), include, id: input });
 
 if (options.compress) config = compress_config(config);
 

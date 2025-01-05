@@ -14,14 +14,14 @@ export { bnf_config as config };
 /**
  * Shortcut for tokenize(source, bnf.literals);
  */
-function tokenizeBnf(source: string): Token[] {
-	return tokenize(source, bnf_config.literals);
+function tokenizeBnf(source: string, unit?: string): Token[] {
+	return tokenize(source, bnf_config.literals, unit);
 }
 
 export { tokenizeBnf as tokenize };
 
-export function parseSource(source: string, log?: LogFn): AST {
-	return parse({ ...bnf_config, log, source });
+export function parseSource(source: string, log?: LogFn, unit?: string): AST {
+	return parse({ ...bnf_config, log, source, id: unit });
 }
 
 function parseBnf(tokens: Token[], log?: LogFn): AST {
@@ -356,10 +356,11 @@ export function create_config(ast: AST, options: CreateConfigOptions): Config {
 		logger(node?: Node): [Logger, (level: IssueLevel, message: string) => Issue] {
 			const _log = logger(this.log, { depth: this.depth, kind: node?.kind || 'node' });
 
-			const shared_issue_info = { line: 0, position: 0, column: 0, ...node, id: this.id, source: ast.source };
+			const shared_issue_info: Omit<Issue, 'level' | 'message' | 'stack'> = { location: node, source: ast.source };
 
 			function _log_issue(level: IssueLevel, message: string): Issue {
-				const issue = { ...shared_issue_info, level, message };
+				const { stack } = new Error();
+				const issue = { ...shared_issue_info, level, message, stack };
 				_log(issue);
 				return issue;
 			}
@@ -374,7 +375,7 @@ export function create_config(ast: AST, options: CreateConfigOptions): Config {
 	}
 
 	if (!config.root_nodes?.length) {
-		context.logger()[1](0, 'No root nodes are defined! You will need to add root node(s) manually.');
+		context.logger()[1](1, 'No root nodes are defined! You will need to add root node(s) manually.');
 	}
 
 	return config;

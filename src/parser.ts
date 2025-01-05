@@ -141,7 +141,7 @@ export function parse(options: ParseOptions): AST {
 	let position = 0,
 		dirtyPosition = 0;
 
-	const raw_tokens = 'tokens' in options ? options.tokens : tokenize(options.source, options.literals);
+	const raw_tokens = 'tokens' in options ? options.tokens : tokenize(options.source, options.literals, id);
 
 	const source = options.source ?? raw_tokens.map(token => token.text).join('');
 
@@ -159,7 +159,7 @@ export function parse(options: ParseOptions): AST {
 	function _issue(level: IssueLevel, message?: string): Issue {
 		const token = tokens[position];
 		const { stack } = new Error();
-		return { id, line: token.line, column: token.column, position: token.position, source, level, message, stack };
+		return { location: token, source, level, message, stack };
 	}
 
 	function parseNode(kind: string, parents: string[] = []): Node | null {

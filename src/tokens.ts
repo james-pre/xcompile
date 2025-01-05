@@ -1,11 +1,21 @@
 import type { Issue } from './issue.js';
 
-export interface Token {
-	kind: string;
-	text: string;
+/**
+ * A location in source text
+ */
+export interface Location {
 	line: number;
 	column: number;
 	position: number;
+	/**
+	 * The file, internal module, shared object, etc.
+	 */
+	unit?: string;
+}
+
+export interface Token extends Location {
+	kind: string;
+	text: string;
 }
 
 export interface TokenDefinition {
@@ -13,7 +23,13 @@ export interface TokenDefinition {
 	pattern: RegExp;
 }
 
-export function tokenize(source: string, definitions: Iterable<TokenDefinition>): Token[] {
+export interface TokenizeOptions {
+	source: string;
+	unit?: string;
+	definitions: Iterable<TokenDefinition>;
+}
+
+export function tokenize(source: string, definitions: Iterable<TokenDefinition>, unit?: string): Token[] {
 	const tokens: Token[] = [];
 
 	let line = 1;
@@ -27,12 +43,12 @@ export function tokenize(source: string, definitions: Iterable<TokenDefinition>)
 		for (const { name, pattern } of definitions) {
 			const match = pattern.exec(slice);
 			if (match && match[0].length > (token?.text.length || 0)) {
-				token = { kind: name, text: match[0], line, column, position };
+				token = { kind: name, text: match[0], line, column, position, unit };
 			}
 		}
 
 		if (!token) {
-			throw { line, column, position, source, message: 'Unexpected token: ' + source[position], level: 0, stack: new Error().stack } satisfies Issue;
+			throw { location: { line, column, position, unit }, source, message: 'Unexpected token: ' + source[position], level: 0, stack: new Error().stack } satisfies Issue;
 		}
 
 		tokens.push(token);
