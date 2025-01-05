@@ -52,9 +52,6 @@ export function ast_to_config(ast: Node[], log: Logger = () => {}, include?: (na
 				case 'root':
 					rootNodes.push(...contents.split(/[ ,;]/));
 					break;
-				case 'override_root':
-					rootNodes = contents.split(/[ ,;]/);
-					break;
 				case 'ignore':
 					ignoreLiterals.push(...contents.split(/[ ,;]/));
 					break;
