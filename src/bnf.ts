@@ -1,7 +1,8 @@
 import rawConfig from './bnf.json' with { type: 'json' };
 import type { Config, Json, PureConfig } from './config.js';
 import { parse_json } from './config.js';
-import type { DefinitionPart, Logger, Node } from './parser.js';
+import type { Issue, IssueLevel } from './issue.js';
+import type { AST, DefinitionPart, LogFn, Logger, Node } from './parser.js';
 import { logger, parse } from './parser.js';
 import type { Token } from './tokens.js';
 import { tokenize } from './tokens.js';
@@ -19,11 +20,11 @@ function tokenizeBnf(source: string): Token[] {
 
 export { tokenizeBnf as tokenize };
 
-export function parseSource(source: string, log?: Logger): Node[] {
+export function parseSource(source: string, log?: LogFn): AST {
 	return parse({ ...bnf_config, log, source });
 }
 
-function parseBnf(tokens: Token[], log?: Logger): Node[] {
+function parseBnf(tokens: Token[], log?: LogFn): AST {
 	return parse({ ...bnf_config, log, tokens });
 }
 
@@ -36,8 +37,9 @@ const typeForGroup = {
 } as const;
 
 export interface CreateConfigOptions {
-	log?: Logger;
+	log?: LogFn;
 	include?: (name: string) => Node[];
+	id?: string;
 }
 
 interface CreateConfigContext extends CreateConfigOptions {
@@ -50,6 +52,11 @@ interface CreateConfigContext extends CreateConfigOptions {
 	 * The config being created
 	 */
 	config: PureConfig;
+
+	/**
+	 * Get a logger for a node
+	 */
+	logger(node: Node): [Logger, (level: IssueLevel, message: string) => Issue];
 }
 
 /**
@@ -63,9 +70,10 @@ function child_context(context: CreateConfigContext): CreateConfigContext {
 	};
 }
 
-function config_process_directive(text: string, $: CreateConfigContext) {
-	const log = logger($.log, { kind: 'directive', depth: $.depth });
-	const [, directive, contents] = text.match(/##(\w+) (.*)/i)!;
+function config_process_directive($: CreateConfigContext, node: Node) {
+	const [log, log_issue] = $.logger(node);
+
+	const [, directive, contents] = node.text.match(/##(\w+) (.*)/i)!;
 
 	switch (directive) {
 		// ##ignore <rules...>
@@ -79,7 +87,7 @@ function config_process_directive(text: string, $: CreateConfigContext) {
 		// ##include <file.bnf>
 		case 'include':
 			if (!$.include) {
-				log(0, 'Warning: Missing include()');
+				log_issue(1, 'Missing include()');
 				break;
 			}
 			log(1, 'Including: ' + contents);
@@ -92,7 +100,7 @@ function config_process_directive(text: string, $: CreateConfigContext) {
 			const [, name, flags] = contents.match(/(\w+)\s+(\w+)/) || [];
 			const literal = $.config.literals.find(({ name: n }) => n == name);
 			if (!literal) {
-				log(0, 'Warning: ##flags references missing literal: ' + name);
+				log_issue(1, '##flags references missing literal: ' + name);
 				break;
 			}
 
@@ -106,14 +114,14 @@ function config_process_directive(text: string, $: CreateConfigContext) {
 			const groupNames = _names.split(/[\s,]+/);
 			const rule = $.config.definitions.find(d => d.name == name);
 			if (!rule) {
-				log(0, 'Warning: ##groups: missing rule ' + JSON.stringify(name));
+				log_issue(1, '##groups: missing rule ' + JSON.stringify(name));
 				break;
 			}
 			for (let i = 0; i < groupNames.length; i++) {
 				const group = $.config.definitions.find(d => d.name == name + '#' + i);
 
 				if (!group) {
-					log(0, 'Warning: ##groups: missing group ' + i);
+					log_issue(1, '##groups: missing group ' + i);
 					break;
 				}
 
@@ -131,7 +139,7 @@ function config_process_directive(text: string, $: CreateConfigContext) {
 			break;
 		}
 		default:
-			log(0, 'Warning: unsupported directive: ' + directive);
+			log_issue(2, 'unsupported directive: ' + directive);
 	}
 }
 
@@ -163,37 +171,38 @@ function config_process_expression($: CreateConfigContext, expression: Node, rul
 
 	let isAlternation = false;
 
-	const _log = logger($.log, { kind: expression.kind, depth: $.depth });
+	const [_log, log_issue] = $.logger(expression);
 
 	const pattern: DefinitionPart[] = [];
 
-	for (const term of expression.children || []) {
-		if (term.kind == 'pipe') {
+	for (const child of expression.children || []) {
+		if (child.kind == 'pipe') {
 			isAlternation = true;
 			_log(2, 'Found pipe in expression');
 			continue;
 		}
 
-		if (term.kind == 'expression_continue' || term.kind == 'expression#0') {
+		if (child.kind == 'expression_continue' || child.kind == 'expression#0') {
 			_log(2, 'Found expression_continue');
 			let next;
-			[next, isAlternation] = config_process_expression(sub_context, term, rule);
+			[next, isAlternation] = config_process_expression(sub_context, child, rule);
 			pattern.push(...next);
 			continue;
 		}
 
-		if (term.kind != 'sequence' && term.kind != 'sequence_continue' && term.kind != 'sequence#0') {
-			_log(2, 'Invalid expression child: ' + term.kind);
+		if (child.kind != 'sequence' && child.kind != 'sequence_continue' && child.kind != 'sequence#0') {
+			_log(2, 'Invalid expression child: ' + child.kind);
 			continue;
 		}
 
-		_log(2, `Parsing sequence at ${term.line}:${term.column}`);
-		if (!term.children?.length) {
+		_log(2, `Parsing sequence at ${child.line}:${child.column}`);
+		if (!child.children?.length) {
 			_log(2, 'Sequence has no children');
 			continue;
 		}
-		for (const factor of term.children) {
-			const node = factor.children?.[0] ?? factor;
+
+		for (const grandchild of child.children) {
+			const node = grandchild.children?.[0] ?? grandchild;
 
 			_log(2, `Parsing ${node.kind} "${node.text}" at ${node.line}:${node.column}`);
 			switch (node.kind) {
@@ -210,23 +219,23 @@ function config_process_expression($: CreateConfigContext, expression: Node, rul
 							$.config.literals.push({ name: text, pattern: regex });
 						}
 					} catch (e: any) {
-						throw `Invalid literal: ${text}: ${e.message}`;
+						throw log_issue(0, `invalid literal: ${text} (${e.message})`);
 					}
 
 					pattern.push({ kind: text, type: 'required' });
 					break;
 				}
 				case 'identifier': {
-					const modifer = factor.children?.[1]?.kind;
+					const modifer = grandchild.children?.[1]?.kind;
 					pattern.push({ kind: node.text, type: modifer == '\\?' ? 'optional' : modifer == '\\*' ? 'repeated' : 'required' });
 					break;
 				}
 				case 'left_bracket':
 				case 'left_brace':
 				case 'left_paren': {
-					const inner = factor.children?.find(({ kind }) => kind == 'expression');
+					const inner = grandchild.children?.find(({ kind }) => kind == 'expression');
 					if (!inner) {
-						_log(1, 'Missing inner expression');
+						_log(1, 'Missing inner expression (empty?)');
 						break;
 					}
 
@@ -255,7 +264,7 @@ function config_process_expression($: CreateConfigContext, expression: Node, rul
 					break;
 				}
 				default:
-					_log(1, `Unexpected kind "${node.kind}" of factor child`);
+					_log(1, `Unexpected kind "${node.kind}" of expression grandchild`);
 					break;
 			}
 		}
@@ -264,16 +273,17 @@ function config_process_expression($: CreateConfigContext, expression: Node, rul
 	return [pattern, isAlternation];
 }
 
-function config_process_node($: CreateConfigContext, node: Node) {
+function config_process_node($: CreateConfigContext, node: Node): void {
 	const sub_context = child_context($);
 
-	const log = logger($.log, { kind: node.kind, depth: $.depth });
+	const [log, log_issue] = $.logger(node);
 
 	log(3, `Processing ${node.kind} at ${node.line}:${node.column}`);
 
 	switch (node.kind) {
 		case 'directive':
-			config_process_directive(node.text, sub_context);
+			config_process_directive(sub_context, node);
+			break;
 	}
 
 	if (node.kind != 'rule') {
@@ -290,7 +300,9 @@ function config_process_node($: CreateConfigContext, node: Node) {
 
 	log(2, `Found rule "${name}" at ${node.line}:${node.column}`);
 	if (!name || !expression) {
-		log(1, 'Rule is missing name or expression');
+		// A rule missing a name should *never* happen
+
+		log_issue(+!!name, name ? `Rule "${name}" is missing a value` : 'Rule is missing name (unreachable!)');
 		return;
 	}
 
@@ -311,17 +323,13 @@ function config_process_node($: CreateConfigContext, node: Node) {
 
 	const index = $.config.literals.findIndex(l => l.name == maybeLiteral);
 	if (index != -1 && pattern.length == 1 && pattern[0].type == 'required' && $.config.literals[index].pattern.source.slice(1) == pattern[0].kind) {
-		let regex;
 		try {
-			regex = new RegExp('^' + maybeLiteral);
+			const pattern = new RegExp('^' + maybeLiteral);
+			$.config.literals.splice(index, 1, { name, pattern });
+			return;
 		} catch (e: any) {
-			throw `Invalid literal: ${name}: ${e}`;
+			throw log_issue(0, `invalid literal: ${name} (${e.message})`);
 		}
-		$.config.literals.splice(index, 1, {
-			name,
-			pattern: regex,
-		});
-		return;
 	}
 
 	// Add the NodeDefinition for this rule
@@ -332,7 +340,7 @@ function config_process_node($: CreateConfigContext, node: Node) {
 	});
 }
 
-export function create_config(ast: Node[], options: CreateConfigOptions): Config {
+export function create_config(ast: AST, options: CreateConfigOptions): Config {
 	const config: PureConfig = {
 		definitions: [],
 		literals: [],
@@ -345,15 +353,28 @@ export function create_config(ast: Node[], options: CreateConfigOptions): Config
 		depth: 0,
 		config,
 		groups: 0,
+		logger(node?: Node): [Logger, (level: IssueLevel, message: string) => Issue] {
+			const _log = logger(this.log, { depth: this.depth, kind: node?.kind || 'node' });
+
+			const shared_issue_info = { line: 0, position: 0, column: 0, ...node, id: this.id, source: ast.source };
+
+			function _log_issue(level: IssueLevel, message: string): Issue {
+				const issue = { ...shared_issue_info, level, message };
+				_log(issue);
+				return issue;
+			}
+
+			return [_log, _log_issue];
+		},
 	};
 
 	// Start processing from the root node
-	for (const node of ast) {
+	for (const node of ast.nodes) {
 		config_process_node(context, node);
 	}
 
-	if (!config.root_nodes) {
-		throw 'Missing root node';
+	if (!config.root_nodes?.length) {
+		context.logger()[1](0, 'No root nodes are defined! You will need to add root node(s) manually.');
 	}
 
 	return config;

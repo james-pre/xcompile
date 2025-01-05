@@ -1,5 +1,5 @@
 import type { Common as CommonConfig } from './config.js';
-import type { IssueLevel, Issue } from './issue.js';
+import { type IssueLevel, type Issue, is_issue } from './issue.js';
 import type { Token, TokenDefinition } from './tokens.js';
 import { tokenize } from './tokens.js';
 
@@ -42,15 +42,17 @@ export interface LogInfo {
 	event?: 'attempt' | 'resolve' | 'fail' | 'start';
 }
 
-export type Logger = (info: LogInfo | Issue) => void;
+export type LogFn = (info: LogInfo | Issue) => void;
 
-export function logger(log: Logger | undefined, options: Partial<LogInfo> & Pick<LogInfo, 'kind' | 'depth'>) {
+export type Logger = { (level: number, message: string, tags?: string[]): void; (issue: Issue): void };
+
+export function logger(log: LogFn | undefined, options: Partial<LogInfo> & Pick<LogInfo, 'kind' | 'depth'>): Logger {
 	if (!log) return () => {};
 
 	function __log__(level: number, message: string, tags?: string[]): void;
 	function __log__(issue: Issue): void;
 	function __log__(level: number | Issue, message: string = '<unknown>', tags: string[] = []): void {
-		if (typeof level == 'object') {
+		if (is_issue(level)) {
 			log!(level);
 			return;
 		}
@@ -84,7 +86,7 @@ export interface ParseOptionsShared extends CommonConfig {
 	definitions: NodeDefinition[];
 	maxNodeDepth?: number;
 	maxCycles?: number;
-	log?: Logger;
+	log?: LogFn;
 	id?: string;
 	source?: string;
 }
@@ -122,7 +124,12 @@ interface ParseInfo {
 
 export const parse_info = new Map<string, ParseInfo>();
 
-export function parse(options: ParseOptions): Node[] {
+export interface AST {
+	nodes: Node[];
+	source: string;
+}
+
+export function parse(options: ParseOptions): AST {
 	const max_depth = options.maxNodeDepth ?? 100;
 	const max_cycles = options.maxCycles ?? 5;
 	const id = options.id;
@@ -219,7 +226,7 @@ export function parse(options: ParseOptions): Node[] {
 						return _cache(node);
 					}
 				}
-				log(1, 'Warning: No matches for alternation', ['alternation', 'fail']);
+				log(1, 'No matches for alternation', ['alternation', 'fail']);
 				return null;
 			}
 			case 'sequence': {
@@ -281,5 +288,5 @@ export function parse(options: ParseOptions): Node[] {
 		}
 		nodes.push(node);
 	}
-	return nodes;
+	return { nodes, source };
 }
