@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 import { parse, parse_info, stringify_node } from '../dist/parser.js';
-import { parse_json as parseJSONConfig } from '../dist/config.js';
+import { parse_json as parse_json_config } from '../dist/config.js';
 import { tokenize } from '../dist/tokens.js';
 import { is_issue, stringify_issue } from '../dist/issue.js';
 
@@ -69,7 +69,7 @@ for (const rawOption of options.debug) {
 
 let config;
 try {
-	config = parseJSONConfig(JSON.parse(readFileSync(options.config, 'utf-8')));
+	config = parse_json_config(JSON.parse(readFileSync(options.config, 'utf-8')));
 } catch (e) {
 	if ('errno' in e) console.error(e);
 	else console.error('Failed to resolve config:', e);

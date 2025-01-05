@@ -1,4 +1,4 @@
-export interface SourceIssue {
+export interface Issue {
 	id?: string;
 	line: number;
 	column: number;
@@ -16,7 +16,7 @@ export enum IssueLevel {
 }
 
 /**
- * Placed into \x1b[<here>m
+ * Placed into ANSI escape code
  */
 const colors = {
 	[IssueLevel.Error]: 31,
@@ -34,7 +34,7 @@ function extract_location(stack: string = ''): string {
 	return '(unknown origin)';
 }
 
-export function is_issue(i: unknown): i is SourceIssue {
+export function is_issue(i: unknown): i is Issue {
 	return typeof i == 'object' && i != null && 'line' in i && 'column' in i && 'position' in i && 'source' in i && 'level' in i;
 }
 
@@ -43,7 +43,7 @@ export interface IssueFormatting {
 	trace: boolean;
 }
 
-export function stringify_issue(i: SourceIssue, options: Partial<IssueFormatting>): string {
+export function stringify_issue(i: Issue, options: Partial<IssueFormatting>): string {
 	const level = options.colors ? `\x1b[1;${colors[i.level]}m${IssueLevel[i.level]}\x1b[0m` : IssueLevel[i.level];
 
 	const trace = options.trace ? ' ' + extract_location(i.stack) : '';
@@ -61,5 +61,5 @@ export function stringify_issue(i: SourceIssue, options: Partial<IssueFormatting
 		column -= offset;
 	}
 
-	return `${i.id}:${i.line}:${column}\n\t${excerpt}\n\t${' '.repeat(column)}^\n${level}: ${i.message}${trace}`;
+	return `${i.id ? i.id + ':' : ''}${i.line}:${column}\n\t${excerpt}\n\t${' '.repeat(column)}^\n${level}: ${i.message}${trace}`;
 }

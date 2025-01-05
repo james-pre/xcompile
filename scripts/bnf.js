@@ -112,7 +112,7 @@ function include(path) {
 	}
 }
 
-let config = bnf.ast_to_config(ast, logger(verbose), include);
+let config = bnf.create_config(ast, { log: logger(verbose), include });
 
 if (options.compress) config = compress_config(config);
 

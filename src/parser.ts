@@ -1,5 +1,5 @@
 import type { Common as CommonConfig } from './config.js';
-import type { IssueLevel, SourceIssue } from './issue.js';
+import type { IssueLevel, Issue } from './issue.js';
 import type { Token, TokenDefinition } from './tokens.js';
 import { tokenize } from './tokens.js';
 
@@ -140,7 +140,7 @@ export function parse(options: ParseOptions): Node[] {
 
 	const attempts = new Map<string, Node | null>();
 
-	function _issue(level: IssueLevel, message?: string): SourceIssue {
+	function _issue(level: IssueLevel, message?: string): Issue {
 		const token = tokens[position];
 		const { stack } = new Error();
 		return { id, line: token.line, column: token.column, position: token.position, source, level, message, stack };

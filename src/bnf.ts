@@ -35,12 +35,12 @@ const typeForGroup = {
 	left_paren: 'required',
 } as const;
 
-export interface ASTConfigOptions {
+export interface CreateConfigOptions {
 	log?: Logger;
 	include?: (name: string) => Node[];
 }
 
-interface ASTConfigContext extends ASTConfigOptions {
+interface CreateConfigContext extends CreateConfigOptions {
 	/**
 	 * The current depth
 	 */
@@ -68,14 +68,14 @@ interface ASTConfigContext extends ASTConfigOptions {
  * Creates a copy of a context for use with children.
  * Right now this just increments the depth
  */
-function child_context(context: ASTConfigContext): ASTConfigContext {
+function child_context(context: CreateConfigContext): CreateConfigContext {
 	return {
 		...context,
 		depth: context.depth + 1,
 	};
 }
 
-function config_process_directive(text: string, $: ASTConfigContext) {
+function config_process_directive(text: string, $: CreateConfigContext) {
 	const log = logger($.log, { kind: 'directive', depth: $.depth });
 	const [, directive, contents] = text.match(/##(\w+) (.*)/i)!;
 
@@ -147,7 +147,7 @@ function config_process_directive(text: string, $: ASTConfigContext) {
 	}
 }
 
-function config_process_expression(expression: Node, $: ASTConfigContext): [DefinitionPart[], boolean] {
+function config_process_expression(expression: Node, $: CreateConfigContext): [DefinitionPart[], boolean] {
 	const _sub = child_context($);
 
 	let isAlternation = false;
@@ -253,7 +253,7 @@ function config_process_expression(expression: Node, $: ASTConfigContext): [Defi
 	return [pattern, isAlternation];
 }
 
-function config_process_node(node: Node, $: ASTConfigContext) {
+function config_process_node(node: Node, $: CreateConfigContext) {
 	const _sub = child_context($);
 
 	const log = logger($.log, { kind: node.kind, depth: $.depth });
@@ -324,7 +324,7 @@ function config_process_node(node: Node, $: ASTConfigContext) {
 	});
 }
 
-export function create_config(ast: Node[], options: ASTConfigOptions): Config {
+export function create_config(ast: Node[], options: CreateConfigOptions): Config {
 	const config: PureConfig = {
 		definitions: [],
 		literals: [],
