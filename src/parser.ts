@@ -87,7 +87,7 @@ export interface ParseAndTokenize extends ParseOptionsShared {
 
 export interface ParseOnly extends ParseOptionsShared {
 	tokens: Token[];
-	literals: string[];
+	literals: Iterable<TokenDefinition> | string[];
 }
 
 export type ParseOptions = ParseOnly | ParseAndTokenize;

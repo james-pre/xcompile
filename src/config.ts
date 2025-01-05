@@ -1,4 +1,4 @@
-import type { NodeDefinition } from './parser.js';
+import type { NodeDefinition, PureNodeDefinition } from './parser.js';
 import type { TokenDefinition } from './tokens.js';
 
 export interface TokenDefinitionJSON {
@@ -17,6 +17,13 @@ export interface Json {
 export interface Config {
 	literals: TokenDefinition[];
 	definitions: NodeDefinition[];
+	rootNodes: string[];
+	ignoreLiterals: string[];
+}
+
+export interface PureConfig {
+	literals: TokenDefinition[];
+	definitions: PureNodeDefinition[];
 	rootNodes: string[];
 	ignoreLiterals: string[];
 }
