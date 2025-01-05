@@ -11,8 +11,6 @@ character_constant = "(u8|u|U|L)?'([^'\\\n]|\\['\"\\?abfnrtv]|\\[0-7]{1,3}|\\x[0
 
 string_literal = '(u8|u|U|L)?"([^"\\\n]|\\["\'\\?abfnrtv]|\\[0-7]{1,3}|\\x[0-9A-Fa-f]+|\\u[0-9A-Fa-f]{4}|\\U[0-9A-Fa-f]{8})*"';
 
-quote = "'";
-
 token =
 | keyword
 | identifier 
@@ -56,23 +54,17 @@ constant =
 
 integer_constant = (decimal_constant | octal_constant | hexadecimal_constant | binary_constant) integer_suffix?;
 
-decimal_constant = nonzero_digit {quote? digit};
-
 octal_constant = "0[0-7]['0-7]+";
+
+decimal_constant = "1-9['0-9]*";
 
 hexadecimal_constant = hexadecimal_prefix hexadecimal_digit_sequence;
 
-binary_constant = binary_prefix binary_digit {quote? binary_digit};
+binary_constant = "0(b|B)(0|1)['01]*";
 
 hexadecimal_prefix = "0(x|X)";
 
-binary_prefix = "0(b|B)";
-
-nonzero_digit = "[1-9]";
-
 hexadecimal_digit_sequence = "[0-9a-fA-F]['0-9a-fA-F]*";
-
-binary_digit = "0|1";
 
 integer_suffix =
 | (unsigned_suffix long_suffix?)
