@@ -10,16 +10,19 @@ export interface DefinitionPart {
 
 export type DefinitionType = 'alternation' | 'sequence';
 
-export interface PureNodeDefinition {
-	name: string;
-	type: DefinitionType;
-	pattern: DefinitionPart[];
+export interface NodeAttributes {
+	[k: string]: string | number | boolean;
 }
 
 export interface NodeDefinition {
 	name: string;
 	type: DefinitionType;
+	attributes: NodeAttributes;
 	pattern: (string | DefinitionPart)[];
+}
+
+export interface PureNodeDefinition extends NodeDefinition {
+	pattern: DefinitionPart[];
 }
 
 export interface Node extends Token {
@@ -157,7 +160,7 @@ export function parse(options: ParseOptions): AST {
 	const attempts = new Map<string, Node | null>();
 
 	function _issue(level: IssueLevel, message?: string): Issue {
-		const token = tokens[position];
+		const token = tokens[dirtyPosition || position];
 		const { stack } = new Error();
 		return { location: token, source, level, message, stack };
 	}

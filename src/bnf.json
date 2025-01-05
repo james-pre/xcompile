@@ -88,11 +88,29 @@
 			]
 		},
 		{
+			"name": "attribute-value",
+			"type": "alternation",
+			"pattern": [
+				{ "kind": "identifier", "type": "required" },
+				{ "kind": "string", "type": "required" },
+				{ "kind": "number", "type": "required" }
+			]
+		},
+		{
+			"name": "attribute#0",
+			"type": "sequence",
+			"pattern": [
+				{ "kind": ":", "type": "required" },
+				{ "kind": "attribute-value", "type": "required" }
+			]
+		},
+		{
 			"name": "attribute",
 			"type": "sequence",
 			"pattern": [
 				{ "kind": "@", "type": "required" },
-				{ "kind": "identifier", "type": "required" }
+				{ "kind": "identifier", "type": "required" },
+				{ "kind": "attribute#0", "type": "optional" }
 			]
 		},
 		{
@@ -115,6 +133,7 @@
 		{ "name": "comment", "pattern": "#(?!#)([^\\n]*)" },
 		{ "name": "directive", "pattern": "##\\w+ [^\\n]*" },
 		{ "name": "comma", "pattern": "," },
+		{ "name": "number", "pattern": "[0-9]+(\\.[0-9]+)?" },
 		{ "name": "pipe", "pattern": "\\|" },
 		{ "name": "left_paren", "pattern": "\\(" },
 		{ "name": "right_paren", "pattern": "\\)" },
@@ -125,6 +144,7 @@
 		{ "name": "\\?", "pattern": "\\?" },
 		{ "name": "\\*", "pattern": "\\*" },
 		{ "name": "@", "pattern": "@" },
+		{ "name": ":", "pattern": ":" },
 		{ "name": "=", "pattern": "=" },
 		{ "name": ";", "pattern": ";" }
 	],

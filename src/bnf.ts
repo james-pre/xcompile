@@ -227,7 +227,10 @@ function config_process_expression($: CreateConfigContext, expression: Node, rul
 				}
 				case 'identifier': {
 					const modifer = grandchild.children?.[1]?.kind;
-					pattern.push({ kind: node.text, type: modifer == '\\?' ? 'optional' : modifer == '\\*' ? 'repeated' : 'required' });
+					pattern.push({
+						kind: node.text,
+						type: modifer == '\\?' ? 'optional' : modifer == '\\*' ? 'repeated' : 'required',
+					});
 					break;
 				}
 				case 'left_bracket':
@@ -253,6 +256,7 @@ function config_process_expression($: CreateConfigContext, expression: Node, rul
 					const subName = `${rule.name}#${rule.groups++}`;
 
 					$.config.definitions.push({
+						attributes: {},
 						name: subName,
 						type: isAlternation ? 'alternation' : 'sequence',
 						pattern: subPattern,
@@ -273,19 +277,46 @@ function config_process_expression($: CreateConfigContext, expression: Node, rul
 	return [pattern, isAlternation];
 }
 
-function config_process_rule($: CreateConfigContext, node: Node): void {
-	const [log, log_issue] = $.logger(node);
+function config_process_rule($: CreateConfigContext, rule: Node): void {
+	const [log, log_issue] = $.logger(rule);
+
+	if (!rule.children) {
+		log_issue(0, 'Invalid rule (missing contents)');
+		return;
+	}
 
 	// Extract the rule name (identifier) and its expression
-	const name = node.children?.find(child => child.kind === 'identifier')?.text;
-	const expression = node.children?.find(child => child.kind === 'expression');
+	const name = rule.children.find(child => child.kind === 'identifier')?.text;
 
-	log(2, `Found rule "${name}" at ${node.line}:${node.column}`);
+	const expression = rule.children.find(child => child.kind === 'expression');
+
+	log(2, `Found rule "${name}" at ${rule.line}:${rule.column}`);
 	if (!name || !expression) {
 		// A rule missing a name should *never* happen
 
 		log_issue(+!!name, name ? `Rule "${name}" is missing a value` : 'Rule is missing name (unreachable!)');
 		return;
+	}
+
+	const attributes: Record<string, string | boolean> = {};
+	const attribute_nodes = rule.children.filter(child => child.kind == 'attribute');
+
+	for (const node of attribute_nodes) {
+		const [, attr_id, attr_value = null] = node.children!;
+
+		let value = true;
+		if (attr_value) {
+			const [, { kind, text }] = attr_value.children!;
+
+			value =
+				kind == 'string'
+					? JSON.parse(text)
+					: kind == 'number'
+						? parseFloat(text)
+						: ($.logger(attr_value)[1](1, 'Using identifiers for attribute values is not support yet (value set to null)'), null);
+		}
+
+		attributes[attr_id.text] = value;
 	}
 
 	const [pattern, isAlternation] = config_process_expression(child_context($), expression, { name, groups: 0 });
@@ -318,6 +349,7 @@ function config_process_rule($: CreateConfigContext, node: Node): void {
 	$.config.definitions.push({
 		name,
 		type: isAlternation ? 'alternation' : 'sequence',
+		attributes,
 		pattern: pattern.map(part => (typeof part === 'string' ? { kind: part, type: 'required' } : part)),
 	});
 }
@@ -359,7 +391,10 @@ export function create_config(ast: AST, options: CreateConfigOptions): Config {
 		logger(node?: Node): [Logger, (level: IssueLevel, message: string) => Issue] {
 			const _log = logger(this.log, { depth: this.depth, kind: node?.kind || 'node' });
 
-			const shared_issue_info: Omit<Issue, 'level' | 'message' | 'stack'> = { location: node, source: ast.source };
+			const shared_issue_info: Omit<Issue, 'level' | 'message' | 'stack'> = {
+				location: node,
+				source: ast.source,
+			};
 
 			function _log_issue(level: IssueLevel, message: string): Issue {
 				const { stack } = new Error();

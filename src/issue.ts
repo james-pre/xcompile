@@ -23,9 +23,12 @@ const colors = {
 	[IssueLevel.Note]: 36,
 };
 
-function extract_location(stack: string = ''): string {
+function extract_trace(stack: string = ''): string {
 	for (const line of stack.split('\n').map(l => l.trim())) {
-		if (!line.startsWith('at ') || line.startsWith('at _')) continue;
+		if (!line.startsWith('at ')) continue;
+		const [, symbol] = line.split(' ');
+
+		if (symbol.startsWith('_') || symbol.includes('_log_')) continue;
 
 		return line;
 	}
@@ -45,7 +48,7 @@ export interface IssueFormatting {
 export function stringify_issue(i: Issue, options: Partial<IssueFormatting>): string {
 	const level = options.colors ? `\x1b[1;${colors[i.level]}m${IssueLevel[i.level]}\x1b[0m` : IssueLevel[i.level];
 
-	const trace = options.trace ? ' ' + extract_location(i.stack) : '';
+	const trace = options.trace ? ' ' + extract_trace(i.stack) : '';
 
 	const base_message = `${level}: ${i.message}${trace}`;
 

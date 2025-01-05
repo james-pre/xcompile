@@ -1,11 +1,21 @@
 
 string          = '("(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\')';
 identifier      = '[a-zA-Z_][\w-]*';
+number          = '[0-9]+(\.[0-9]+)?';
+
+@ignore
 whitespace      = '[ \t]+';
+
+@ignore
 line_terminator	= "\n+";
+
+@ignore
 comment         = "#(?!#)([^\n]*)";
+
+@ignore comma   = ',';
+
+@root
 directive       = "##\w+ [^\n]*";
-comma           = ',';
 
 # Simplifies internals
 
@@ -16,8 +26,6 @@ left_bracket = '\[';
 right_bracket = '\]';
 left_brace = '\{';
 right_brace = '\}';
-
-##ignore whitespace comment line_terminator comma
 
 # groups
 parenthesized = left_paren expression right_paren;
@@ -30,8 +38,9 @@ term = parenthesized | optional | repetition | string | identifier;
 sequence = term*;
 expression = sequence {pipe sequence};
 
-attribute = '@' identifier;
+attribute-value = identifier | string | number;
 
+attribute = '@' identifier [':' attribute-value];
+
+@root
 rule = attribute* identifier '=' expression ';';
-
-##root rule directive

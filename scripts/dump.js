@@ -87,7 +87,7 @@ try {
 
 let tokens;
 try {
-	tokens = tokenize(source, config.literals);
+	tokens = tokenize(source, config.literals, input);
 } catch (e) {
 	console.error(is_issue(e) ? stringify_issue(e, { colors: true, trace }) : e.message);
 	process.exit(1);
@@ -101,7 +101,7 @@ if (options.tokens) {
 	if (options.quiet) process.exit(0);
 
 	for (const token of tokens) {
-		if (options.mode != 'all' && config.ignoreLiterals.includes(token.kind)) continue;
+		if (options.mode != 'all' && config.ignored_literals.includes(token.kind)) continue;
 		console.log(stringify_node(token));
 	}
 
@@ -142,6 +142,6 @@ try {
 
 if (options.quiet) process.exit(0);
 
-for (const node of ast) {
+for (const node of ast.nodes) {
 	console.log(stringify_node(node));
 }
