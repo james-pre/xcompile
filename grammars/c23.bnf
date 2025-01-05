@@ -52,52 +52,11 @@ constant =
 | character_constant 
 | predefined_constant;
 
-integer_constant = (decimal_constant | octal_constant | hexadecimal_constant | binary_constant) integer_suffix?;
+integer_constant = "(0|[1-9]['0-9]*|0[0-7]['0-7]+|0x[0-9a-f]['0-9a-f]*|0b[01]['01]*)(u(l|ll|wb)?|(l|ll|wb)u?)?";
+##flags integer_constant i
 
-octal_constant = "0[0-7]['0-7]+";
-
-decimal_constant = "1-9['0-9]*";
-
-hexadecimal_constant = hexadecimal_prefix hexadecimal_digit_sequence;
-
-binary_constant = "0(b|B)(0|1)['01]*";
-
-hexadecimal_prefix = "0(x|X)";
-
-hexadecimal_digit_sequence = "[0-9a-fA-F]['0-9a-fA-F]*";
-
-integer_suffix =
-| (unsigned_suffix long_suffix?)
-| (unsigned_suffix long_long_suffix)
-| (unsigned_suffix bit_precise_int_suffix)
-| (long_suffix unsigned_suffix?)
-| (long_long_suffix unsigned_suffix?)
-| (bit_precise_int_suffix unsigned_suffix?);
-
-bit_precise_int_suffix = "wb|WB";
-unsigned_suffix = "u|U";
-long_suffix = "l|L";
-long_long_suffix = "ll|LL";
-
-floating_constant = decimal_floating_constant | hexadecimal_floating_constant;
-
-decimal_floating_constant =
-| (fractional_constant exponent_part? floating_suffix?)  
-| (digit_sequence exponent_part floating_suffix?);
-
-hexadecimal_floating_constant = hexadecimal_prefix ([hexadecimal_digit_sequence? "\."] hexadecimal_digit_sequence) binary_exponent_part floating_suffix?;
-
-fractional_constant =
-| (digit_sequence? "\." digit_sequence)
-| (digit_sequence "\.");
-
-exponent_part = "(e|E)(\+|-)?[0-9]['0-9]*";
-
-digit_sequence = "[0-9]['0-9]*";
-
-binary_exponent_part = "(p|P)(\+|-)?[0-9]['0-9]*";
-
-floating_suffix = "f|l|df|dd|dl|F|L|DF|DD|DL";
+floating_constant = "((([0-9]['0-9]*)?\.[0-9]['0-9]*|[0-9]['0-9]*\.)(e(\+|-)?[0-9]['0-9]*)?|[0-9]['0-9]*e(\+|-)?[0-9]['0-9]*|0x(([0-9a-f]['0-9a-f]*)?\.)?[0-9a-f]['0-9a-f]*(p(\+|-)?[0-9]['0-9]*)?)(f|l|df|dd|dl)?";
+##flags integer_constant i
 
 enumeration_constant = identifier;
 
@@ -153,7 +112,7 @@ unary_expression =
 | (sizeof "\(" type_name "\)")
 | (alignof "\(" type_name "\)");
 
-unary_operator = "[&\*\+-~!]";
+unary_operator = "&" | "\*" | "\+" | "-" | "~" | "!";
 
 cast_expression = unary_expression | ("\(" type_name "\)" cast_expression);
 
@@ -201,7 +160,7 @@ assignment_expression =
 | conditional_expression
 | (unary_expression assignment_operator assignment_expression);
 
-assignment_operator = "(\*|/|%|\+|-|<<|>>|&|\^|\|)?=";
+assignment_operator = "\*=" | "/=" | "%=" | "\+=" | "-=" | "<<=" | ">>=" | "&=" | "\^=" | "\|=" | "=";
 
 expression =
 | assignment_expression 
@@ -581,6 +540,7 @@ preprocessing_token = __pp_token_base | punctuator;
 __pp_token_base =
 | header_name
 | identifier
+| keyword
 | pp_number 
 | character_constant
 | string_literal;
@@ -601,6 +561,6 @@ __header_name = '<[^\n>]*>|"[^\n\"]*"';
 # # any member of the source character set except the character and "
 # q_char = digit | nondigit | punctuator;
 
-pp_number = "\.?[0-9](['\w]|(e|E|p|P)(\+|-)|\.)*";
+pp_number = integer_constant | floating_constant;
 
 identifier = "[_a-zA-Z]\w*";

@@ -35,10 +35,11 @@ const typeForGroup = {
 export function ast_to_config(ast: Node[], log: Logger = () => {}, include?: (name: string) => Node[]): config.Config {
 	const definitions: PureNodeDefinition[] = [],
 		literals: TokenDefinition[] = [],
+		rootNodes: string[] = [],
 		ignoreLiterals: string[] = [];
+
 	let currentNode: string,
-		groups = 0,
-		rootNodes: string[] = [];
+		groups = 0;
 
 	function processNode(node: Node, depth: number = 0) {
 		const _log = logger(log, { kind: node.kind, depth });
