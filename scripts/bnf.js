@@ -126,7 +126,7 @@ switch (options.format) {
 				literals: config.literals.map(literal => {
 					const base = {
 						name: literal.name,
-						pattern: literal.pattern.source,
+						pattern: literal.pattern.source.slice(1),
 					};
 
 					const { flags } = literal.pattern;

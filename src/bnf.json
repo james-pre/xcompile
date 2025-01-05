@@ -88,9 +88,18 @@
 			]
 		},
 		{
+			"name": "attribute",
+			"type": "sequence",
+			"pattern": [
+				{ "kind": "@", "type": "required" },
+				{ "kind": "identifier", "type": "required" }
+			]
+		},
+		{
 			"name": "rule",
 			"type": "sequence",
 			"pattern": [
+				{ "kind": "attribute", "type": "repeated" },
 				{ "kind": "identifier", "type": "required" },
 				{ "kind": "=", "type": "required" },
 				{ "kind": "expression", "type": "required" },
@@ -100,7 +109,7 @@
 	],
 	"literals": [
 		{ "name": "string", "pattern": "(\"(?:\\\\.|[^\"\\\\])*\"|'(?:\\\\.|[^'\\\\])*')" },
-		{ "name": "identifier", "pattern": "[a-zA-Z_]\\w*" },
+		{ "name": "identifier", "pattern": "[a-zA-Z_][\\w-]*" },
 		{ "name": "whitespace", "pattern": "[ \\t]+" },
 		{ "name": "line_terminator", "pattern": "\\n+" },
 		{ "name": "comment", "pattern": "#(?!#)([^\\n]*)" },
@@ -115,6 +124,7 @@
 		{ "name": "right_brace", "pattern": "\\}" },
 		{ "name": "\\?", "pattern": "\\?" },
 		{ "name": "\\*", "pattern": "\\*" },
+		{ "name": "@", "pattern": "@" },
 		{ "name": "=", "pattern": "=" },
 		{ "name": ";", "pattern": ";" }
 	],

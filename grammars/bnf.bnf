@@ -1,6 +1,6 @@
 
 string          = '("(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\')';
-identifier      = '[a-zA-Z_]\w*';
+identifier      = '[a-zA-Z_][\w-]*';
 whitespace      = '[ \t]+';
 line_terminator	= "\n+";
 comment         = "#(?!#)([^\n]*)";
@@ -30,6 +30,8 @@ term = parenthesized | optional | repetition | string | identifier;
 sequence = term*;
 expression = sequence {pipe sequence};
 
-rule = identifier '=' expression ';';
+attribute = '@' identifier;
+
+rule = attribute* identifier '=' expression ';';
 
 ##root rule directive
