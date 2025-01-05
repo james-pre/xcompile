@@ -50,18 +50,6 @@ interface CreateConfigContext extends CreateConfigOptions {
 	 * The config being created
 	 */
 	config: PureConfig;
-
-	/**
-	 * The name of the rule currently being parsed.
-	 * Used for group names.
-	 */
-	currentRule?: string;
-
-	/**
-	 * The number of groups in the current rule.
-	 * Used for group names.
-	 */
-	groups: number;
 }
 
 /**
@@ -96,7 +84,7 @@ function config_process_directive(text: string, $: CreateConfigContext) {
 			}
 			log(1, 'Including: ' + contents);
 			for (const node of $.include(contents)) {
-				config_process_node(node, child_context($));
+				config_process_node(child_context($), node);
 			}
 			break;
 		// ##flags <rule> <flags>
@@ -147,8 +135,31 @@ function config_process_directive(text: string, $: CreateConfigContext) {
 	}
 }
 
-function config_process_expression(expression: Node, $: CreateConfigContext): [DefinitionPart[], boolean] {
-	const _sub = child_context($);
+/**
+ * Info about a rule that is used when parsing an expression
+ */
+interface RuleInfo {
+	/**
+	 * The name of the rule being parsed.
+	 * Used for group names.
+	 */
+	name?: string;
+
+	/**
+	 * The number of groups in the rule.
+	 * Used for group names.
+	 */
+	groups: number;
+}
+
+/**
+ * An expression parsed by `config_process_expression`.
+ * This might be change to an object later.
+ */
+type ParsedExpression = [pattern: DefinitionPart[], isAlternation: boolean];
+
+function config_process_expression($: CreateConfigContext, expression: Node, rule: RuleInfo): ParsedExpression {
+	const sub_context = child_context($);
 
 	let isAlternation = false;
 
@@ -166,7 +177,7 @@ function config_process_expression(expression: Node, $: CreateConfigContext): [D
 		if (term.kind == 'expression_continue' || term.kind == 'expression#0') {
 			_log(2, 'Found expression_continue');
 			let next;
-			[next, isAlternation] = config_process_expression(term, _sub);
+			[next, isAlternation] = config_process_expression(sub_context, term, rule);
 			pattern.push(...next);
 			continue;
 		}
@@ -221,7 +232,7 @@ function config_process_expression(expression: Node, $: CreateConfigContext): [D
 
 					const type = typeForGroup[node.kind];
 
-					const [subPattern, isAlternation] = config_process_expression(inner, _sub);
+					const [subPattern, isAlternation] = config_process_expression(sub_context, inner, rule);
 
 					// Check if subPattern contains another rule name, if so, no need to create a new group
 					const existing = subPattern.length == 1 && subPattern[0].kind !== 'string' ? subPattern[0].kind : null;
@@ -230,7 +241,7 @@ function config_process_expression(expression: Node, $: CreateConfigContext): [D
 						break;
 					}
 
-					const subName = `${$.currentRule}#${$.groups++}`;
+					const subName = `${rule.name}#${rule.groups++}`;
 
 					$.config.definitions.push({
 						name: subName,
@@ -253,8 +264,8 @@ function config_process_expression(expression: Node, $: CreateConfigContext): [D
 	return [pattern, isAlternation];
 }
 
-function config_process_node(node: Node, $: CreateConfigContext) {
-	const _sub = child_context($);
+function config_process_node($: CreateConfigContext, node: Node) {
+	const sub_context = child_context($);
 
 	const log = logger($.log, { kind: node.kind, depth: $.depth });
 
@@ -262,13 +273,13 @@ function config_process_node(node: Node, $: CreateConfigContext) {
 
 	switch (node.kind) {
 		case 'directive':
-			config_process_directive(node.text, _sub);
+			config_process_directive(node.text, sub_context);
 	}
 
 	if (node.kind != 'rule') {
 		// Recursively process child nodes
 		for (const child of node.children || []) {
-			config_process_node(child, _sub);
+			config_process_node(sub_context, child);
 		}
 		return;
 	}
@@ -283,10 +294,7 @@ function config_process_node(node: Node, $: CreateConfigContext) {
 		return;
 	}
 
-	$.currentRule = name;
-	$.groups = 0;
-
-	const [pattern, isAlternation] = config_process_expression(expression, _sub);
+	const [pattern, isAlternation] = config_process_expression(sub_context, expression, { name, groups: 0 });
 
 	/*
 		Inline single-use literals
@@ -341,7 +349,7 @@ export function create_config(ast: Node[], options: CreateConfigOptions): Config
 
 	// Start processing from the root node
 	for (const node of ast) {
-		config_process_node(node, context);
+		config_process_node(context, node);
 	}
 
 	if (!config.root_nodes) {

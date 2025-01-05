@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 import { readFileSync, writeFileSync } from 'node:fs';
-import { inspect, parseArgs } from 'node:util';
+import { parseArgs } from 'node:util';
 import * as bnf from '../dist/bnf.js';
 import { stringify_node } from '../dist/parser.js';
 import { is_issue, stringify_issue } from '../dist/issue.js';
-import { dirname, resolve } from 'node:path/posix';
+import { dirname, parse, resolve } from 'node:path/posix';
 import { compress as compress_config } from '../dist/config.js';
 
 const {
@@ -12,7 +12,6 @@ const {
 	values: options,
 } = parseArgs({
 	options: {
-		format: { short: 'f', type: 'string', default: 'js' },
 		output: { short: 'o', type: 'string' },
 		colors: { short: 'c', type: 'boolean' },
 		tokens: { short: 'T', type: 'string' },
@@ -21,6 +20,7 @@ const {
 		help: { short: 'h', type: 'boolean', default: false },
 		compress: { type: 'boolean', default: false },
 		trace: { type: 'boolean' },
+		'visual-depth': { type: 'string', default: '0' },
 	},
 	allowPositionals: true,
 });
@@ -28,7 +28,6 @@ const {
 if (options.help || !input) {
 	console.log(`Usage: xcompile-bnf [options] <file>\n
 Output options:
-    --format,-f <format=js>  Output format (js, json)
     --output,-o <path>       Path to an output file
     --colors,-c              Colorize output messages
     --help,-h                Display this help message  
@@ -37,7 +36,8 @@ Debugging options:
     --tokens,-T [only]       Show tokenizer output. If 'only', only the tokenizer output will be shown.
     --parser,-P [only]       Show parser output. If 'only', only the parser output will be shown.
     --verbose,-V             Show verbose output. If passed multiple times, increases the verbosity level.
-    --trace                  Show issue origin trace`);
+    --visual-depth <size>    Display depth visually using indentation, using 
+    --trace                  Show issue origin`);
 	process.exit(0);
 }
 
@@ -51,11 +51,24 @@ if ((options.tokens == 'only' || options.parser == 'only') && (options.format ||
 	process.exit(1);
 }
 
+const depth_indentation = parseInt(options['visual-depth']) || 0;
+
 function logger(outputLevel) {
-	return function ({ level, message, depth }) {
+	return function __log(entry) {
+		if (is_issue(entry)) {
+			console.error(stringify_issue(entry, options));
+			return;
+		}
+
+		const { level, message, depth } = entry;
+
 		if (outputLevel < level) return;
 
-		console.log(' '.repeat(4 * depth) + (level > 2 ? '[debug] ' : '') + message);
+		const debug = level > 2 ? 'debug' : '';
+
+		const header = depth_indentation ? `${' '.repeat(depth_indentation)}(${debug})` : `[${depth} ${debug}]`;
+
+		console.log(header + ' ' + message);
 	};
 }
 
@@ -116,30 +129,19 @@ let config = bnf.create_config(ast, { log: logger(verbose), include });
 
 if (options.compress) config = compress_config(config);
 
-const write = data => (options.output ? writeFileSync(options.output, data) : console.log);
+writeFileSync(
+	options.output || parse(input).name + '.json',
+	JSON.stringify({
+		...config,
+		literals: config.literals.map(literal => {
+			const base = {
+				name: literal.name,
+				pattern: literal.pattern.source.slice(1),
+			};
 
-switch (options.format) {
-	case 'json':
-		write(
-			JSON.stringify({
-				...config,
-				literals: config.literals.map(literal => {
-					const base = {
-						name: literal.name,
-						pattern: literal.pattern.source.slice(1),
-					};
+			const { flags } = literal.pattern;
 
-					const { flags } = literal.pattern;
-
-					return flags.length ? { ...base, flags } : base;
-				}),
-			})
-		);
-		break;
-	case 'js':
-		write(inspect(config, { colors: options.colors, depth: null }));
-		break;
-	default:
-		console.error('Unsupported output format:', options.format);
-		process.exit(1);
-}
+			return flags.length ? { ...base, flags } : base;
+		}),
+	})
+);

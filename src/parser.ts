@@ -42,12 +42,19 @@ export interface LogInfo {
 	event?: 'attempt' | 'resolve' | 'fail' | 'start';
 }
 
-export type Logger = (info: LogInfo) => void;
+export type Logger = (info: LogInfo | Issue) => void;
 
-export function logger(log: Logger | undefined, options: Partial<LogInfo> & Pick<LogInfo, 'kind' | 'depth'>): (level: number, message: string, tags?: string[]) => void {
+export function logger(log: Logger | undefined, options: Partial<LogInfo> & Pick<LogInfo, 'kind' | 'depth'>) {
 	if (!log) return () => {};
 
-	return function (level, message, tags = []) {
+	function __log__(level: number, message: string, tags?: string[]): void;
+	function __log__(issue: Issue): void;
+	function __log__(level: number | Issue, message: string = '<unknown>', tags: string[] = []): void {
+		if (typeof level == 'object') {
+			log!(level);
+			return;
+		}
+
 		// parse tags into type and stage
 
 		let type: DefinitionType | undefined, stage: LogInfo['event'] | undefined;
@@ -67,8 +74,10 @@ export function logger(log: Logger | undefined, options: Partial<LogInfo> & Pick
 			}
 		}
 
-		log({ ...options, level, message, type, event: stage });
-	};
+		log!({ ...options, level, message, type, event: stage });
+	}
+
+	return __log__;
 }
 
 export interface ParseOptionsShared extends CommonConfig {
