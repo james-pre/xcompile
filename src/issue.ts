@@ -1,4 +1,4 @@
-import type { Location } from './tokens.js';
+import { location_text, type Location } from './tokens.js';
 
 export interface Issue {
 	location?: Location;
@@ -64,5 +64,5 @@ export function stringify_issue(i: Issue, options: Partial<IssueFormatting>): st
 		column -= offset;
 	}
 
-	return `${i.location.unit ? i.location.unit + ':' : ''}${i.location.line}:${column}\n\t${excerpt}\n\t${' '.repeat(column)}^\n${base_message}`;
+	return `${location_text(i.location)}\n\t${excerpt}\n\t${' '.repeat(column)}^\n${base_message}`;
 }

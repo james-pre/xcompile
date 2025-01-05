@@ -13,6 +13,10 @@ export interface Location {
 	unit?: string;
 }
 
+export function location_text(loc: Location): string {
+	return `${loc.unit ? loc.unit + ':' : ''}${loc.line}:${loc.column}`;
+}
+
 export interface Token extends Location {
 	kind: string;
 	text: string;

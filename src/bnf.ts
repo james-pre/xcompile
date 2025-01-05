@@ -5,7 +5,7 @@ import type { Issue, IssueLevel } from './issue.js';
 import type { AST, DefinitionPart, LogFn, Logger, Node } from './parser.js';
 import { logger, parse } from './parser.js';
 import type { Token } from './tokens.js';
-import { tokenize } from './tokens.js';
+import { location_text, tokenize } from './tokens.js';
 
 const bnf_config = parse_json(rawConfig as Json);
 
@@ -167,7 +167,7 @@ interface RuleInfo {
 type ParsedExpression = [pattern: DefinitionPart[], isAlternation: boolean];
 
 function config_process_expression($: CreateConfigContext, expression: Node, rule: RuleInfo): ParsedExpression {
-	const sub_context = child_context($);
+	const $sub = child_context($);
 
 	let isAlternation = false;
 
@@ -185,7 +185,7 @@ function config_process_expression($: CreateConfigContext, expression: Node, rul
 		if (child.kind == 'expression_continue' || child.kind == 'expression#0') {
 			_log(2, 'Found expression_continue');
 			let next;
-			[next, isAlternation] = config_process_expression(sub_context, child, rule);
+			[next, isAlternation] = config_process_expression($sub, child, rule);
 			pattern.push(...next);
 			continue;
 		}
@@ -241,7 +241,7 @@ function config_process_expression($: CreateConfigContext, expression: Node, rul
 
 					const type = typeForGroup[node.kind];
 
-					const [subPattern, isAlternation] = config_process_expression(sub_context, inner, rule);
+					const [subPattern, isAlternation] = config_process_expression($sub, inner, rule);
 
 					// Check if subPattern contains another rule name, if so, no need to create a new group
 					const existing = subPattern.length == 1 && subPattern[0].kind !== 'string' ? subPattern[0].kind : null;
@@ -273,26 +273,8 @@ function config_process_expression($: CreateConfigContext, expression: Node, rul
 	return [pattern, isAlternation];
 }
 
-function config_process_node($: CreateConfigContext, node: Node): void {
-	const sub_context = child_context($);
-
+function config_process_rule($: CreateConfigContext, node: Node): void {
 	const [log, log_issue] = $.logger(node);
-
-	log(3, `Processing ${node.kind} at ${node.line}:${node.column}`);
-
-	switch (node.kind) {
-		case 'directive':
-			config_process_directive(sub_context, node);
-			break;
-	}
-
-	if (node.kind != 'rule') {
-		// Recursively process child nodes
-		for (const child of node.children || []) {
-			config_process_node(sub_context, child);
-		}
-		return;
-	}
 
 	// Extract the rule name (identifier) and its expression
 	const name = node.children?.find(child => child.kind === 'identifier')?.text;
@@ -306,7 +288,7 @@ function config_process_node($: CreateConfigContext, node: Node): void {
 		return;
 	}
 
-	const [pattern, isAlternation] = config_process_expression(sub_context, expression, { name, groups: 0 });
+	const [pattern, isAlternation] = config_process_expression(child_context($), expression, { name, groups: 0 });
 
 	/*
 		Inline single-use literals
@@ -338,6 +320,27 @@ function config_process_node($: CreateConfigContext, node: Node): void {
 		type: isAlternation ? 'alternation' : 'sequence',
 		pattern: pattern.map(part => (typeof part === 'string' ? { kind: part, type: 'required' } : part)),
 	});
+}
+
+function config_process_node($: CreateConfigContext, node: Node): void {
+	const [log] = $.logger(node);
+
+	log(3, `Processing ${node.kind} (${location_text(node)})`);
+
+	switch (node.kind) {
+		case 'directive':
+			config_process_directive($, node);
+			return;
+		case 'rule':
+			config_process_rule($, node);
+			return;
+		default:
+			// Recursively process child nodes
+			for (const child of node.children || []) {
+				config_process_node(child_context($), child);
+			}
+			return;
+	}
 }
 
 export function create_config(ast: AST, options: CreateConfigOptions): Config {
