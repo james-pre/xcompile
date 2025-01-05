@@ -35,11 +35,10 @@ const typeForGroup = {
 export function ast_to_config(ast: Node[], log: Logger = () => {}, include?: (name: string) => Node[]): config.Config {
 	const definitions: PureNodeDefinition[] = [],
 		literals: TokenDefinition[] = [],
-		ignoreLiterals: string[] = [],
-		rootNodes: string[] = [];
-
+		ignoreLiterals: string[] = [];
 	let currentNode: string,
-		groups = 0;
+		groups = 0,
+		rootNodes: string[] = [];
 
 	function processNode(node: Node, depth: number = 0) {
 		const _log = logger(log, { kind: node.kind, depth });
@@ -52,6 +51,9 @@ export function ast_to_config(ast: Node[], log: Logger = () => {}, include?: (na
 			switch (directive) {
 				case 'root':
 					rootNodes.push(...contents.split(/[ ,;]/));
+					break;
+				case 'override_root':
+					rootNodes = contents.split(/[ ,;]/);
 					break;
 				case 'ignore':
 					ignoreLiterals.push(...contents.split(/[ ,;]/));

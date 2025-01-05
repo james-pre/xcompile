@@ -1,6 +1,4 @@
-##include common.bnf
-
-##root group_part
+##include language.bnf
 
 group_part =
 | control_line
@@ -10,23 +8,21 @@ group_part =
 
 if_section = if_group elif_group* else_group? endif_line;
 
-if_group = "#" (
-| ("if\b" constant_expression group_part*)
-| ("ifdef\b" identifier group_part*)
-| ("ifndef\b" identifier group_part*)
-);
+if_group =
+| ("#if\b" constant_expression group_part*)
+| ("#ifdef\b" identifier group_part*)
+| ("#ifndef\b" identifier group_part*);
 ##groups if_group %#if %#ifdef %#ifndef
 
-elif_group = "#" (
-| ("elif\b" constant_expression group_part*)
-| ("elifdef\b" identifier group_part*)
-| ("elifndef\b" identifier group_part*)
-);
+elif_group =
+| ("#elif\b" constant_expression group_part*)
+| ("#elifdef\b" identifier group_part*)
+| ("#elifndef\b" identifier group_part*);
 ##groups elif_group %#elif %#elifdef %#elifndef
 
-else_group = "#" "else\b" group_part*;
+else_group = "#else\b" group_part*;
 
-endif_line = "#" "endif\b";
+endif_line = "#endif\b";
 
 control_line = "#" (
 | ("include\b" header_name)
@@ -159,4 +155,4 @@ pp_number = "\.?[0-9](['\w]|(e|E|p|P)(\+|-)|\.)*";
 
 identifier = "[_a-zA-Z]\w*";
 
-##include punctuator.bnf
+##override_root group_part

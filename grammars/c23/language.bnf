@@ -1,4 +1,17 @@
-##include common.bnf
+
+comment = "\/\/[^\n]*|\/\*[\s\S]*?\*\/";
+whitespace = '\s+';
+
+##ignore comment whitespace
+
+# String and character constants
+
+# Due to comments handling, we need to have a literal for the entire character constant
+character_constant = "(u8|u|U|L)?'([^'\\\n]|\\['\"\\?abfnrtv]|\\[0-7]{1,3}|\\x[0-9A-Fa-f]+|\\u[0-9A-Fa-f]{4}|\\U[0-9A-Fa-f]{8})*'";
+
+string_literal = '(u8|u|U|L)?"([^"\\\n]|\\["\'\\?abfnrtv]|\\[0-7]{1,3}|\\x[0-9A-Fa-f]+|\\u[0-9A-Fa-f]{4}|\\U[0-9A-Fa-f]{8})*"';
+
+quote = "'";
 
 token =
 | keyword
@@ -100,7 +113,17 @@ enumeration_constant = identifier;
 
 predefined_constant = "false" | "true" | "nullptr";
 
-##include punctuator.bnf
+# `punctuator` minus things used later (e.g. "any pp-token other than ...")
+__punctuator_base = "\." | "\+\+" | "--" | "&" | "\*" | "\+" | "-" | "~" | "!"
+| "/" | "%" | "==" | "!=" | "\^" | "\|" | "&&" | "\|\|" | "\?" | ":" | "::" | ";" | "\.\.\."
+| "=" | "\*=" | "/=" | "%=" | "\+=" | "-=" | "&=" | "\^=" | "\|="
+| "," | "##" | "%:" | "%:%:";
+
+__punctuator_left_angle_brackets = "<<" | "<" | "<=" | "<<=" | "<:" | "<%";
+__punctuator_angle_brackets = __punctuator_left_angle_brackets | ">>" | ">" | ">=" | ">>=" | ":>" | "%>" | "->";
+__punctuator_grouping = "\[" | "\]" | "\(" | "\)" | "\{" | "\}";
+
+punctuator =  __punctuator_base | __punctuator_angle_brackets | __punctuator_grouping;
 
 primary_expression =
 | identifier
@@ -112,7 +135,6 @@ primary_expression =
 generic_selection = "_Generic" "\(" assignment_expression "," generic_assoc_list "\)";
 
 generic_assoc_list = generic_association {"," generic_association};
-
 
 generic_association = (type_name | "default") ":" assignment_expression;
 
@@ -356,7 +378,7 @@ designator_list = designator*;
 
 designator =
 | ("\[" constant_expression "\]")
-| ("." identifier);
+| ("\." identifier);
 
 static_assert_declaration = "static_assert" "\(" constant_expression ["," string_literal] "\)" ";";
 
