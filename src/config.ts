@@ -36,7 +36,7 @@ export function parseJSONLiteral(literal: TokenDefinitionJSON): TokenDefinition 
 	if ($) literal.pattern = literal.pattern.slice(0, -1);
 
 	return {
-		name: literal.name,
+		...literal,
 		pattern: new RegExp('^(' + literal.pattern + ')' + ($ ? '$' : ''), literal.flags),
 	};
 }

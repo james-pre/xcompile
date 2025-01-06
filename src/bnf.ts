@@ -256,7 +256,6 @@ function configProcessExpression($: CreateConfigContext, expression: Node, rule:
 					const subName = `${rule.name}#${rule.groups++}`;
 
 					$.config.definitions.push({
-						attributes: {},
 						name: subName,
 						type: isAlternation ? 'alternation' : 'sequence',
 						pattern: subPattern,
@@ -275,6 +274,12 @@ function configProcessExpression($: CreateConfigContext, expression: Node, rule:
 	}
 
 	return [pattern, isAlternation];
+}
+
+export interface RuleAttributes {
+	root?: boolean;
+	ignore?: boolean;
+	[k: string]: string | number | boolean | undefined;
 }
 
 function configProcessRule($: CreateConfigContext, rule: Node): void {
@@ -298,7 +303,7 @@ function configProcessRule($: CreateConfigContext, rule: Node): void {
 		return;
 	}
 
-	const attributes: Record<string, string | boolean> = {};
+	const attributes: RuleAttributes = {};
 	const attributeNodes = rule.children.filter(child => child.kind == 'attribute');
 
 	for (const node of attributeNodes) {
@@ -320,6 +325,8 @@ function configProcessRule($: CreateConfigContext, rule: Node): void {
 
 	const [pattern, isAlternation] = configProcessExpression(childContext($), expression, { name, groups: 0 });
 
+	if (attributes.root) $.config.root_nodes.push(name);
+
 	/*
 		Inline single-use literals
 		For example:
@@ -338,6 +345,7 @@ function configProcessRule($: CreateConfigContext, rule: Node): void {
 		try {
 			const pattern = new RegExp('^' + maybeLiteral);
 			$.config.literals.splice(index, 1, { name, pattern });
+			if (attributes.ignore) $.config.ignored_literals.push(name);
 			return;
 		} catch (e: any) {
 			throw logIssue(0, `invalid literal: ${name} (${e.message})`);
@@ -348,7 +356,6 @@ function configProcessRule($: CreateConfigContext, rule: Node): void {
 	$.config.definitions.push({
 		name,
 		type: isAlternation ? 'alternation' : 'sequence',
-		attributes,
 		pattern: pattern.map(part => (typeof part === 'string' ? { kind: part, type: 'required' } : part)),
 	});
 }

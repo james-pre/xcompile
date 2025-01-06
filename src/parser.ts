@@ -10,14 +10,9 @@ export interface DefinitionPart {
 
 export type DefinitionType = 'alternation' | 'sequence';
 
-export interface NodeAttributes {
-	[k: string]: string | number | boolean;
-}
-
 export interface NodeDefinition {
 	name: string;
 	type: DefinitionType;
-	attributes: NodeAttributes;
 	pattern: (string | DefinitionPart)[];
 }
 
