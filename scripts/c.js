@@ -12,7 +12,7 @@ const {
 	options: {
 		help: { short: 'h', type: 'boolean', default: false },
 		trace: { type: 'boolean' },
-		preprocess: { short: 'P', type: 'boolean' },
+		'preprocess-only': { short: 'P', type: 'boolean' },
 		output: { short: 'o', type: 'string' },
 		quiet: { short: 'q', type: 'boolean' },
 		include: { short: 'I', type: 'string', multiple: true },
@@ -30,7 +30,7 @@ Options:
     -h, --help                       Display this help message
     -o, --output <path>              The path to the output file
     -q, --quiet                      Hide common warnings
-    -P, --preprocess                 Preprocess a file
+    -P, --preprocess-only            Preprocess a file
 	-I, --include <...path>          Use headers from paths for non-path includes and embeds
         --show-imports               Show imports
         --ignore-directive-errors    Ignore error directives
@@ -38,7 +38,7 @@ Options:
 	process.exit(1);
 }
 
-if (!options.preprocess) {
+if (!options['preprocess-only']) {
 	console.error('Non-preprocessing not yet supported.');
 	process.exit(1);
 }
@@ -100,7 +100,7 @@ const processed = preprocess(source, {
 	stripComments: true,
 });
 
-if (options.preprocess) {
+if (options['preprocess-only']) {
 	try {
 		const output = options.output ?? input + '.out';
 		writeFileSync(output, processed.text.replaceAll(/\n{2,}/g, '\n\n'));
