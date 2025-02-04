@@ -29,16 +29,16 @@ const {
 if (options.help || !input) {
 	console.log(`Usage: xcompile-bnf [options] <file>\n
 Output options:
-    --output,-o <path>       Path to an output file
-    --colors,-c              Colorize output messages
-    --help,-h                Display this help message  
-    --compress               Compress the output config
+    -o, --output <path>        Path to an output file
+    -c, --colors               Colorize output messages
+    -h, --help                 Display this help message  
+        --compress             Compress the output config
 Debugging options:
-    --tokens,-T [only]       Show tokenizer output. If 'only', only the tokenizer output will be shown.
-    --parser,-P [only]       Show parser output. If 'only', only the parser output will be shown.
-    --verbose,-V             Show verbose output. If passed multiple times, increases the verbosity level.
-    --visual-depth <size>    Display depth visually using indentation, using 
-    --trace                  Show issue origin`);
+    -T, --tokens [only]        Show tokenizer output. If 'only', only the tokenizer output will be shown.
+    -P, --parser [only]        Show parser output. If 'only', only the parser output will be shown.
+    -V, --verbose              Show verbose output. If passed multiple times, increases the verbosity level.
+        --visual-depth <size>  Display depth visually using indentation, using <size> spaces
+        --trace                Show issue origin`);
 	process.exit(0);
 }
 

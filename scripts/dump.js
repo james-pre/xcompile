@@ -29,20 +29,20 @@ const {
 if (options.help || !input) {
 	console.log(`Usage: xcompile-dump [options] <file>
 Options:
-    --ast,-A             Output the AST
-    --tokens,-T          Output tokens
-    --mode,-m <mode>     Controls --tokens output.
+    -A, --ast             Output the AST
+    -T, --tokens          Output tokens
+    -m, --mode <mode>     Controls --tokens output.
                              normal: Output tokens, excluding ignored literals (default)
                              all: Output all tokens, even ignored literals
-    --config,-c <path>   Specify the config file
-    --quiet,-q           Don't output the AST
-    --info,-I            Output parser info
-    --verbose,-V         Show verbose output. If passed multiple times, increases the verbosity level
-    --trace              Show issue origin trace
-    --debug,-D <option>  Controls debug output when parsing
+    -c, --config <path>   Specify the config file
+    -q, --quiet           Don't output the AST
+    -I, --info            Output parser info
+    -V, --verbose         Show verbose output. If passed multiple times, increases the verbosity level
+        --trace           Show issue origin trace
+    -D, --debug <option>  Controls debug output when parsing
                              depth: Set the maximum depth to output
                              kind: Only output nodes of the given kind
-    --help,-h            Display this help message`);
+    -h, --help            Display this help message`);
 	process.exit(1);
 }
 

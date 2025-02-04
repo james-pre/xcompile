@@ -8,7 +8,8 @@
 	"keywords": [],
 	"bin": {
 		"xcompile-bnf": "scripts/bnf.js",
-		"xcompile-dump": "scripts/dump.js"
+		"xcompile-dump": "scripts/dump.js",
+		"xcompile-c": "scripts/c.js"
 	},
 	"files": [
 		"dist",
