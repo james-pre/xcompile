@@ -97,6 +97,7 @@ const processed = preprocess(source, {
 	unit: input,
 	ignoreDirectiveErrors: options['ignore-directive-errors'],
 	ignoreDirectiveWarnings: options['ignore-directive-warnings'],
+	stripComments: true,
 });
 
 if (options.preprocess) {

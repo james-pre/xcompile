@@ -1,6 +1,6 @@
 import type { Issue, IssueLevel } from './issue.js';
 
-const directive_regex = /^#\s*(\w+)(?:\s+(.*))?$/;
+const directive_regex = /^\s*#\s*(\w+)(?:\s+(.*))?$/;
 const define_regex = /^(\w+)(?:\(([^)]*)\))?\s+(.*)$/;
 
 export type Define = string | ((...args: string[]) => string);
@@ -22,6 +22,7 @@ export interface FileInfo {
  * @property log A unified logging function (for errors, warnings, etc.).
  * @property file A function that returns the content for an include/embed.
  * @property unit An optional unit name (for example, a filename) to attach to Issue locations.
+ * @property stripComments If true, comments (both block and line) will be stripped from the source.
  */
 export interface PreprocessOptions {
 	log?: (info: Issue) => void;
@@ -31,6 +32,7 @@ export interface PreprocessOptions {
 	_files?: Set<string>;
 	ignoreDirectiveErrors?: boolean;
 	ignoreDirectiveWarnings?: boolean;
+	stripComments?: boolean;
 }
 
 // A block representing a conditional (#if/#ifdef etc.) region.
@@ -57,10 +59,11 @@ function isConditionalDirective(dir: string): boolean {
  *
  */
 function evaluateCondition(macro: string, log: (level: IssueLevel, message: string) => void, defines: Map<string, Define>): any {
-	// This converts e.g. "0UL", "123ull", "0x1FUL" into "0", "123", "0x1F", etc.
+	// Remove suffixed numeric constants.
+	// E.g. "0UL", "123ull", "0x1FUL" become "0", "123", "0x1F".
 	macro = macro.replace(/\b((?:0x[\da-fA-F]+|\d+))([uUlL]+)\b/g, '$1');
 
-	// These functions are available to the evaluated expression.
+	// Built-in macro functions and constants available to the evaluated expression.
 	const builtins = {
 		__X_UNDEFINED: () => 0,
 		__has_attribute: (attr: string) => false,
@@ -73,7 +76,7 @@ function evaluateCondition(macro: string, log: (level: IssueLevel, message: stri
 		__x86_64__: true,
 	};
 
-	// Replace both forms: defined(MACRO) and defined MACRO.
+	// Replace defined(MACRO) and defined MACRO.
 	let replaced = macro
 		.replaceAll(/\bdefined\s*\(\s*(\w+)\s*\)/g, (_, macroName) => (defines.has(macroName) || macroName in builtins ? '1' : '0'))
 		.replaceAll(/\bdefined\s+(\w+)/g, (_, macroName) => (defines.has(macroName) || macroName in builtins ? '1' : '0'));
@@ -90,7 +93,7 @@ function evaluateCondition(macro: string, log: (level: IssueLevel, message: stri
 	});
 
 	// Next, replace identifiers not used as function calls.
-	// The negative lookahead (?!\s*\() ensures we do not re-match function-call identifiers.
+	// The negative lookahead (?!\s*\() prevents re-matching function-call identifiers.
 	replaced = replaced.replaceAll(/\b([A-Za-z_]\w*)\b(?!\s*\()/g, (match, id) => {
 		if (id in builtins) return id;
 		if (!defines.has(id)) return '0';
@@ -121,6 +124,17 @@ function evaluateCondition(macro: string, log: (level: IssueLevel, message: stri
  * @returns A Preprocessed object containing the final text and collected macro definitions.
  */
 export function preprocess(source: string, opt: PreprocessOptions): Preprocessed {
+	// Optional comment stripping.
+	if (opt.stripComments) {
+		// Remove block comments while preserving newlines.
+		source = source.replace(/\/\*[\s\S]*?\*\//g, match => {
+			const newlines = match.split('\n').length - 1;
+			return '\n'.repeat(newlines);
+		});
+		// Remove line comments.
+		source = source.replace(/\/\/.*$/gm, '');
+	}
+
 	source = source.replaceAll('\\\n', '');
 
 	const outputLines: string[] = [];
@@ -150,7 +164,7 @@ export function preprocess(source: string, opt: PreprocessOptions): Preprocessed
 			opt.log?.(issue);
 		};
 
-		// Compute the current global active state.
+		// Determine if the current line is active based on conditional stack.
 		const active = !condStack.length || condStack.every(block => block.currentlyActive);
 
 		// Non-directive lines: output them only if all conditionals are active.
