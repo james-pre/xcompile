@@ -56,7 +56,7 @@ integer_constant = "(0|[1-9]['0-9]*|0[0-7]['0-7]+|0x[0-9a-f]['0-9a-f]*|0b[01]['0
 ##flags integer_constant i
 
 floating_constant = "((([0-9]['0-9]*)?\.[0-9]['0-9]*|[0-9]['0-9]*\.)(e(\+|-)?[0-9]['0-9]*)?|[0-9]['0-9]*e(\+|-)?[0-9]['0-9]*|0x(([0-9a-f]['0-9a-f]*)?\.)?[0-9a-f]['0-9a-f]*(p(\+|-)?[0-9]['0-9]*)?)(f|l|df|dd|dl)?";
-##flags integer_constant i
+##flags floating_constant i
 
 enumeration_constant = identifier;
 
