@@ -74,6 +74,9 @@ function evaluateCondition(macro: string, log: (level: IssueLevel, message: stri
 		__GNUC_PREREQ: (maj: number, min: number) => true,
 		__glibc_has_builtin: () => false,
 		__x86_64__: true,
+		__LITTLE_ENDIAN_BITFIELD: true,
+		HZ: 1000,
+		__BYTE_ORDER: 1234,
 	};
 
 	// Replace defined(MACRO) and defined MACRO.
