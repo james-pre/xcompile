@@ -104,7 +104,6 @@ if (options.preprocess) {
 	try {
 		const output = options.output ?? input + '.out';
 		writeFileSync(output, processed.text.replaceAll(/\n{2,}/g, '\n\n'));
-		writeFileSync(output + '-logical.c', processed.logicalSource);
 	} catch (e) {
 		console.error('Failed to write output file:', e);
 		process.exit(1);
