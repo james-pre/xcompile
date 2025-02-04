@@ -91,7 +91,7 @@ const processed = preprocess(source, {
 			}
 		}
 
-		console.error(`Missing system header or embed, <${name}>`);
+		console.error(`Missing system header or embed, <${name}> (from ${unit})`);
 		return { contents: '', unit: '<error>' };
 	},
 	unit: input,
@@ -102,7 +102,7 @@ const processed = preprocess(source, {
 if (options.preprocess) {
 	try {
 		const output = options.output ?? input + '.out';
-		writeFileSync(output, processed.text);
+		writeFileSync(output, processed.text.replaceAll(/\n{2,}/g, '\n\n'));
 		writeFileSync(output + '-logical.c', processed.logicalSource);
 	} catch (e) {
 		console.error('Failed to write output file:', e);

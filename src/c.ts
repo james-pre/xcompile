@@ -1,6 +1,6 @@
 import type { Issue, IssueLevel } from './issue.js';
 
-const directive_regex = /^#(\w+)\s+(.*)$/;
+const directive_regex = /^#\s*(\w+)(?:\s+(.*))?$/;
 const define_regex = /^(\w+)(?:\(([^)]*)\))?\s+(.*)$/;
 
 export type Define = string | ((...args: string[]) => string);
@@ -46,33 +46,52 @@ function isConditionalDirective(dir: string): boolean {
 }
 
 /**
- * This function evaluates a macro. expression in conditional statements
- * @param macro The original macro
- * @param log A function used to log stuff encountered during evaluation.
+ * This function evaluates a macro expression in conditional directives.
+ * It performs various replacements (numeric suffix removal, defined(...) substitution,
+ * identifier replacement) and then evaluates the resulting JavaScript expression.
+ *
+ * @param macro The original macro expression.
+ * @param log A function used to log errors encountered during evaluation.
  * @param defines The current macro definitions.
+ * @returns The evaluated result (typically a number whose truthiness is used for #if conditions).
+ *
  */
 function evaluateCondition(macro: string, log: (level: IssueLevel, message: string) => void, defines: Map<string, Define>): any {
-	// replace suffixed numeric constants
+	// This converts e.g. "0UL", "123ull", "0x1FUL" into "0", "123", "0x1F", etc.
 	macro = macro.replace(/\b((?:0x[\da-fA-F]+|\d+))([uUlL]+)\b/g, '$1');
 
-	// Hard-coded built-in macro functions.
-	const builtins: { [key: string]: (...args: any[]) => any } = {
-		__has_attribute: (attr: string) => true,
-		IS_ENABLED: () => true,
+	// These functions are available to the evaluated expression.
+	const builtins = {
+		__X_UNDEFINED: () => 0,
+		__has_attribute: (attr: string) => false,
+		IS_ENABLED: (name: string) => true,
 		__has_builtin: () => false,
 		IS_BUILTIN: () => false,
+		__GLIBC_USE: (feature: string) => true,
+		__GNUC_PREREQ: (maj: number, min: number) => true,
+		__glibc_has_builtin: () => false,
+		__x86_64__: true,
 	};
 
-	// Replace defined(MACRO) and defined MACRO.
+	// Replace both forms: defined(MACRO) and defined MACRO.
 	let replaced = macro
-		.replaceAll(/\bdefined\s*\(\s*(\w+)\s*\)/g, (_, macro) => (defines.has(macro) ? '1' : '0'))
-		.replaceAll(/\bdefined\s+(\w+)/g, (_, macro) => (defines.has(macro) ? '1' : '0'));
+		.replaceAll(/\bdefined\s*\(\s*(\w+)\s*\)/g, (_, macroName) => (defines.has(macroName) || macroName in builtins ? '1' : '0'))
+		.replaceAll(/\bdefined\s+(\w+)/g, (_, macroName) => (defines.has(macroName) || macroName in builtins ? '1' : '0'));
 
-	// Replace any remaining identifier:
-	// - If it is one of our built-ins, leave it as-is.
-	// - Else if it is defined in `defines`, replace it with its numeric value (or "1" for function-like macros).
-	// - Otherwise, replace it with "0".
-	replaced = replaced.replaceAll(/\b[A-Za-z_]\w*\b/g, id => {
+	// First, replace identifiers used in a function-call context.
+	// The regex uses a positive lookahead to check for an open parenthesis (allowing whitespace).
+	replaced = replaced.replaceAll(/\b([A-Za-z_]\w*)(?=\s*\()/g, (match, id) => {
+		if (id in builtins) return id;
+		if (!defines.has(id)) return '__X_UNDEFINED';
+		const val = defines.get(id);
+		if (typeof val != 'string') return '1';
+		const num = Number(val);
+		return isNaN(num) ? '__X_UNDEFINED' : '1';
+	});
+
+	// Next, replace identifiers not used as function calls.
+	// The negative lookahead (?!\s*\() ensures we do not re-match function-call identifiers.
+	replaced = replaced.replaceAll(/\b([A-Za-z_]\w*)\b(?!\s*\()/g, (match, id) => {
 		if (id in builtins) return id;
 		if (!defines.has(id)) return '0';
 		const val = defines.get(id);
@@ -82,12 +101,13 @@ function evaluateCondition(macro: string, log: (level: IssueLevel, message: stri
 	});
 
 	try {
-		// Evaluate the resulting expression, passing in the built-in functions
+		// The built-in functions are passed as parameters.
 		// eslint-disable-next-line @typescript-eslint/no-implied-eval
-		const func = new Function(...Object.keys(builtins), `return (${replaced});`);
-		return func(...Object.values(builtins));
+		const eval_expression = new Function(...Object.keys(builtins), `return (${replaced});`);
+		return eval_expression(...Object.values(builtins));
 	} catch (e: any) {
 		log(0, 'Failed to evaluate condition: ' + e);
+		return false;
 	}
 }
 
@@ -136,18 +156,25 @@ export function preprocess(source: string, opt: PreprocessOptions): Preprocessed
 		// Non-directive lines: output them only if all conditionals are active.
 		if (!line.trim().startsWith('#')) {
 			if (active) outputLines.push(line);
+			true_position += line.length + 1;
 			continue;
 		}
 
+		// Use the updated directive regex which now allows no arguments.
 		const parts = line.match(directive_regex);
 		if (!parts) {
 			if (active) outputLines.push(line);
+			true_position += line.length + 1;
 			continue;
 		}
-		const [, directive, text] = parts;
+		// Default the text argument to an empty string if missing.
+		const [, directive, text = ''] = parts;
 
 		// Process conditional-control directives even if not active.
-		if (!isConditionalDirective(directive) && !active) continue;
+		if (!isConditionalDirective(directive) && !active) {
+			true_position += line.length + 1;
+			continue;
+		}
 
 		column += directive.length + 1;
 		position += directive.length + 1;
