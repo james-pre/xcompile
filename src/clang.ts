@@ -1,5 +1,7 @@
 /* eslint-disable @typescript-eslint/no-empty-object-type */
 
+import type * as xir from './xir.js';
+
 interface _Location {
 	offset: number;
 	line: number;
@@ -31,7 +33,7 @@ export interface GenericNode {
 		qualType: string;
 		typeAliasDeclId?: string;
 	};
-	inner?: GenericNode[];
+	inner?: Node[];
 	name?: string;
 }
 
@@ -52,7 +54,7 @@ export interface Statement extends GenericNode {
 		| 'ReturnStmt'
 		| 'SwitchStmt'
 		| 'WhileStmt';
-	inner: GenericNode[];
+	inner: Node[];
 }
 
 export interface MiscType extends GenericNode {
@@ -89,6 +91,37 @@ export interface FunctionProtoType extends GenericNode {
 	kind: 'FunctionProtoType';
 	cc?: 'cdecl';
 	loc: never;
+}
+
+export type Type = MiscType | QualType | DeclType | ElaboratedType | ConstantArrayType | FunctionProtoType;
+
+/**
+ * @todo Finish
+ */
+function parseType(node: Node): xir.Type {
+	switch (node.kind) {
+		case 'BuiltinType':
+		case 'ParenType':
+		case 'QualType':
+		case 'EnumType':
+		case 'RecordType':
+		case 'TypedefType':
+		case 'ElaboratedType':
+			return { kind: 'plain', text: node.type.qualType };
+		case 'PointerType':
+			return { kind: 'ref', to: parseType(node.inner![0]) };
+		case 'ConstantArrayType':
+			return { kind: 'const_array', length: node.size, element: parseType(node.inner![0]) };
+		case 'FunctionProtoType':
+			return { kind: 'plain', text: node.type.qualType };
+		default:
+			throw 'Unsupported node kind: ' + node.kind;
+	}
+}
+
+function parseTypedef(node: Declaration): xir.Type {
+	if (!node.inner) return { kind: 'plain', text: node.type.qualType };
+	return parseType(node.inner[0]);
 }
 
 export type StorageClass = 'extern' | 'static';
@@ -242,14 +275,87 @@ export interface DeprecatedAttr extends GenericNode {
 	message: string;
 }
 
-export type Node =
-	| Value
-	| ElaboratedType
-	| QualType
-	| Cast
-	| Declaration
-	| Attribute
-	| DeprecatedAttr
-	| FunctionProtoType
-	| MiscType
-	| Statement;
+export type Node = Value | Type | Cast | Declaration | Attribute | DeprecatedAttr | Statement;
+
+export function* parse(node: Node): IterableIterator<xir.Unit> {
+	switch (node.kind) {
+		case 'AlignedAttr':
+		case 'AllocAlignAttr':
+		case 'AllocSizeAttr':
+		case 'ArraySubscriptExpr':
+		case 'AsmLabelAttr':
+		case 'AttributedStmt':
+		case 'BinaryOperator':
+		case 'BreakStmt':
+		case 'BuiltinAttr':
+		case 'BuiltinType':
+		case 'C11NoReturnAttr':
+		case 'CallExpr':
+		case 'CaseStmt':
+		case 'CharacterLiteral':
+		case 'ColdAttr':
+		case 'CompoundAssignOperator':
+		case 'CompoundLiteralExpr':
+		case 'CompoundStmt':
+		case 'ConditionalOperator':
+		case 'ConstantExpr':
+		case 'ConstAttr':
+		case 'CStyleCastExpr':
+		case 'DeclStmt':
+		case 'DefaultStmt':
+		case 'DeprecatedAttr':
+		case 'DoStmt':
+		case 'ElaboratedType':
+		case 'EnumConstantDecl':
+		case 'EnumDecl':
+		case 'FallThroughAttr':
+		case 'FieldDecl':
+		case 'FloatingLiteral':
+		case 'FormatArgAttr':
+		case 'FormatAttr':
+		case 'ForStmt':
+		case 'FunctionDecl':
+		case 'FunctionProtoType':
+		case 'GotoStmt':
+		case 'IfStmt':
+		case 'ImplicitCastExpr':
+		case 'ImplicitValueInitExpr':
+		case 'IndirectFieldDecl':
+		case 'InitListExpr':
+		case 'IntegerLiteral':
+		case 'LabelStmt':
+		case 'NonNullAttr':
+		case 'NoThrowAttr':
+		case 'NullStmt':
+		case 'ParenExpr':
+		case 'ParenType':
+		case 'ParmVarDecl':
+		case 'PointerType':
+		case 'PredefinedExpr':
+		case 'PureAttr':
+		case 'QualType':
+		case 'RecordDecl':
+		case 'RestrictAttr':
+		case 'ReturnsNonNullAttr':
+		case 'ReturnStmt':
+		case 'ReturnsTwiceAttr':
+		case 'SentinelAttr':
+		case 'StaticAssertDecl':
+		case 'StmtExpr':
+		case 'StringLiteral':
+		case 'SwitchStmt':
+		case 'TranslationUnitDecl':
+			for (const inner of node.inner!) {
+				yield* parse(inner);
+			}
+			return;
+		case 'TypedefDecl':
+			yield { kind: 'type_alias', name: node.name, value: parseTypedef(node) };
+			return;
+		case 'UnaryExprOrTypeTraitExpr':
+		case 'UnaryOperator':
+		case 'VarDecl':
+		case 'WarnUnusedResultAttr':
+		case 'WhileStmt':
+	}
+}

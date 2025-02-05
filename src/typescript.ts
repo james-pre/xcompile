@@ -1,8 +1,7 @@
-import type { Type, Unit } from './ir.js';
-import { isBuiltin, isNumeric } from './ir.js';
+import * as xir from './xir.js';
 
 function _baseType(typename: string): string {
-	if (!isBuiltin(typename)) return typename.replaceAll(' ', '_');
+	if (!xir.isBuiltin(typename)) return typename.replaceAll(' ', '_');
 
 	switch (typename) {
 		case 'int8':
@@ -23,27 +22,51 @@ function _baseType(typename: string): string {
 	}
 }
 
-function emitType(type: Type): string {
-	let base = _baseType(type.name);
-	for (let i = 0; i < (type.reference ?? 0); i++) base = `Ref<${base}>`;
+function emitType(type: xir.Type): string {
+	let base = '';
+
+	switch (type.kind) {
+		case 'plain':
+			base = _baseType(type.text);
+			break;
+		case 'const_array':
+			base = `Tuple<${emitType(type.element)}, ${type.length}>`;
+			break;
+		case 'ref':
+			base = `Ref<${emitType(type.to)}>`;
+			break;
+	}
+
 	if (type.constant) base = `Readonly<${base}>`;
 	return base;
 }
 
-function emitBlock(block: Unit[]): string {
+function emitBlock(block: xir.Unit[]): string {
 	return `{${block.map(emit).join(';')}}`;
 }
 
-function emitList(expr: Unit[]): string {
+function emitList(expr: xir.Unit[]): string {
 	return `(${expr.map(emit).join(', ')})`;
 }
 
-/** Utilium type decorator for class member */
-function emitDecorator(type: Type): string {
-	return isBuiltin(type.name) ? (isNumeric(type.name) ? '@t.' + type.name : '@t.uint8') : `@member(${type.name})`;
+function _baseDecorator(typename: string): string {
+	return xir.isBuiltin(typename) ? (xir.isNumeric(typename) ? '@t.' + typename : '@t.uint8') : `@member(${typename})`;
 }
 
-export function emit(u: Unit): string {
+/** Utilium type decorator for class member */
+function emitDecorator(type: xir.Type): string {
+	switch (type.kind) {
+		case 'plain':
+			return _baseDecorator(type.text);
+		case 'const_array':
+			if (type.element.kind != 'plain') throw 'Nested arrays in structs not supported.';
+			return _baseDecorator(type.element.text);
+		case 'ref':
+			return '/* ref */ ' + emitDecorator(type.to);
+	}
+}
+
+export function emit(u: xir.Unit): string {
 	switch (u.kind) {
 		case 'function':
 			return `function ${u.name} ${emitList(u.parameters)}: ${emitType(u.returns)}\n${emitBlock(u.body)}`;
@@ -113,4 +136,12 @@ export function emit(u: Unit): string {
 		case 'union':
 			return `/* UNSUPPORTED: union ${u.name} */`;
 	}
+}
+
+export function emitAll(units: xir.Unit[]): string {
+	let content = '';
+	for (const unit of units) {
+		content += emit(unit);
+	}
+	return content;
 }

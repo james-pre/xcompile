@@ -25,11 +25,17 @@ export function isBuiltin(type: string): type is BuiltinType {
 	return isNumeric(type) || type == 'void' || type == 'bool';
 }
 
-export interface Type {
+interface _Type {
+	kind: string;
 	constant?: boolean;
-	name: string;
-	reference?: number;
 }
+
+export type Type = _Type &
+	(
+		| { kind: 'plain'; text: string }
+		| { kind: 'const_array'; length: number; element: Type }
+		| { kind: 'ref'; to: Type }
+	);
 
 export type RecordInitializer = { field: string; value: Value }[];
 
