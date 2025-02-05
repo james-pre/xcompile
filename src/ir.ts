@@ -1,14 +1,44 @@
 /** A high-level intermediate representation */
 
-/**
- * @todo Track more information
- */
-export type Type = string;
+const _numerics = [
+	'int8',
+	'uint8',
+	'int16',
+	'uint16',
+	'int32',
+	'uint32',
+	'int64',
+	'uint64',
+	'float32',
+	'float64',
+] as const;
+
+export type BuiltinNumeric = (typeof _numerics)[number];
+
+export type BuiltinType = BuiltinNumeric | 'void' | 'bool';
+
+export function isNumeric(builtin: string): builtin is BuiltinNumeric {
+	return _numerics.includes(builtin as any);
+}
+
+export function isBuiltin(type: string): type is BuiltinType {
+	return isNumeric(type) || type == 'void' || type == 'bool';
+}
+
+export interface Type {
+	constant?: boolean;
+	name: string;
+	reference?: number;
+}
+
+export type RecordInitializer = { field: string; value: Value }[];
+
+export type ValueContents = string | RecordInitializer;
 
 export interface Value {
 	kind: 'value';
 	type: Type;
-	content: string;
+	content: ValueContents;
 }
 
 export type Postfix =
@@ -75,7 +105,7 @@ export interface Ternary {
 export interface Assignment {
 	kind: 'assignment';
 	operator: '=' | '*=' | '/=' | '%=' | '+=' | '-=' | '&=' | '^=' | '|=' | '>>=' | '<<=';
-	left: Unary;
+	left: Expression;
 	right: Expression;
 }
 
@@ -119,11 +149,10 @@ export interface If {
 }
 
 export interface Declaration {
-	kind: 'declaration';
+	kind: 'declaration' | 'field' | 'parameter';
 	name: string;
 	type: Type;
-	/** Default value */
-	value?: Value;
+	initializer?: Value;
 }
 
 export interface Function {
@@ -140,7 +169,7 @@ export interface Record {
 	fields: Declaration[];
 }
 
-export interface FlowControl {
+export interface Labeled {
 	kind: 'break' | 'continue' | 'label' | 'goto';
 	name: string;
 }
@@ -165,7 +194,7 @@ export type Unit =
 	| Switch
 	| Expression
 	| Record
-	| FlowControl
+	| Labeled
 	| Return
 	| TypeAlias
 	| Declaration;
