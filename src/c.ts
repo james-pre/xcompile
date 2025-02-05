@@ -107,6 +107,7 @@ export interface Declaration extends GenericNode {
 		| 'TypedefDecl'
 		| 'VarDecl';
 	isImplicit?: boolean;
+	init?: 'c';
 	/** Only on fields */
 	isBitfield?: boolean;
 	storageClass?: StorageClass;
@@ -154,33 +155,44 @@ export interface Operator extends GenericNode {
 		| '||';
 }
 
-type ValueNodeKind =
-	| 'ArraySubscriptExpr'
-	| 'BinaryOperator'
-	| 'CStyleCastExpr'
-	| 'CallExpr'
-	| 'CharacterLiteral'
-	| 'CompoundAssignOperator'
-	| 'CompoundLiteralExpr'
-	| 'ConditionalOperator'
-	| 'ConstantExpr'
-	| 'DeclRefExpr'
-	| 'FloatingLiteral'
-	| 'ImplicitCastExpr'
-	| 'InitListExpr'
-	| 'IntegerLiteral'
-	| 'MemberExpr'
-	| 'ParenExpr'
-	| 'PredefinedExpr'
-	| 'StmtExpr'
-	| 'StringLiteral'
-	| 'UnaryExprOrTypeTraitExpr'
-	| 'UnaryOperator';
-
 export interface Value extends GenericNode {
-	kind: ValueNodeKind;
+	kind:
+		| 'ArraySubscriptExpr'
+		| 'BinaryOperator'
+		| 'CStyleCastExpr'
+		| 'CallExpr'
+		| 'CharacterLiteral'
+		| 'CompoundAssignOperator'
+		| 'CompoundLiteralExpr'
+		| 'ConditionalOperator'
+		| 'ConstantExpr'
+		| 'FloatingLiteral'
+		| 'ImplicitCastExpr'
+		| 'ImplicitValueInitExpr'
+		| 'InitListExpr'
+		| 'IntegerLiteral'
+		| 'ParenExpr'
+		| 'PredefinedExpr'
+		| 'StmtExpr'
+		| 'StringLiteral'
+		| 'UnaryExprOrTypeTraitExpr'
+		| 'UnaryOperator';
 	valueCategory: ValueCategory;
 	value?: string;
+}
+
+export interface Member extends GenericNode {
+	kind: 'MemberExpr';
+	valueCategory: ValueCategory;
+	name: string;
+	isArrow: boolean;
+	referencedMemberDecl: string;
+}
+
+export interface DeclRefExpr extends GenericNode {
+	kind: 'DeclRefExpr';
+	valueCategory: ValueCategory;
+	referencedDecl: Declaration;
 }
 
 export interface Cast extends GenericNode {
@@ -200,29 +212,27 @@ export interface Cast extends GenericNode {
 		| 'ToVoid';
 }
 
-type AttributeNodeKind =
-	| 'AlignedAttr'
-	| 'AllocAlignAttr'
-	| 'AllocSizeAttr'
-	| 'AsmLabelAttr'
-	| 'BuiltinAttr'
-	| 'C11NoReturnAttr'
-	| 'ColdAttr'
-	| 'ConstAttr'
-	| 'FallThroughAttr'
-	| 'FormatArgAttr'
-	| 'FormatAttr'
-	| 'NoThrowAttr'
-	| 'NonNullAttr'
-	| 'PureAttr'
-	| 'RestrictAttr'
-	| 'ReturnsNonNullAttr'
-	| 'ReturnsTwiceAttr'
-	| 'SentinelAttr'
-	| 'WarnUnusedResultAttr';
-
 export interface Attribute extends GenericNode {
-	kind: AttributeNodeKind;
+	kind:
+		| 'AlignedAttr'
+		| 'AllocAlignAttr'
+		| 'AllocSizeAttr'
+		| 'AsmLabelAttr'
+		| 'BuiltinAttr'
+		| 'C11NoReturnAttr'
+		| 'ColdAttr'
+		| 'ConstAttr'
+		| 'FallThroughAttr'
+		| 'FormatArgAttr'
+		| 'FormatAttr'
+		| 'NoThrowAttr'
+		| 'NonNullAttr'
+		| 'PureAttr'
+		| 'RestrictAttr'
+		| 'ReturnsNonNullAttr'
+		| 'ReturnsTwiceAttr'
+		| 'SentinelAttr'
+		| 'WarnUnusedResultAttr';
 	implicit?: boolean;
 	inherited?: boolean;
 }
