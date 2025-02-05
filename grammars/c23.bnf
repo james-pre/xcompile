@@ -52,10 +52,10 @@ constant =
 | character_constant 
 | predefined_constant;
 
-integer_constant = "(0|[1-9]['0-9]*|0[0-7]['0-7]+|0x[0-9a-f]['0-9a-f]*|0b[01]['01]*)(u(l|ll|wb)?|(l|ll|wb)u?)?";
+integer_constant = "(0|[1-9]['\d]*|0[0-7]['0-7]+|0x[0-9a-f]['0-9a-f]*|0b[01]['01]*)(u(l|ll|wb)?|(l|ll|wb)u?)?";
 ##flags integer_constant i
 
-floating_constant = "((([0-9]['0-9]*)?\.[0-9]['0-9]*|[0-9]['0-9]*\.)(e(\+|-)?[0-9]['0-9]*)?|[0-9]['0-9]*e(\+|-)?[0-9]['0-9]*|0x(([0-9a-f]['0-9a-f]*)?\.)?[0-9a-f]['0-9a-f]*(p(\+|-)?[0-9]['0-9]*)?)(f|l|df|dd|dl)?";
+floating_constant = "(((\d['\d]*)?\.\d['\d]*|\d['\d]*\.)(e(\+|-)?\d['\d]*)?|\d['\d]*e(\+|-)?\d['\d]*|0x(([0-9a-f]['0-9a-f]*)?\.)?[0-9a-f]['0-9a-f]*(p(\+|-)?\d['\d]*)?)(f|l|df|dd|dl)?";
 ##flags floating_constant i
 
 enumeration_constant = identifier;

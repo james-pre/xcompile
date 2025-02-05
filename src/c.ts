@@ -1,9 +1,11 @@
 import type { Issue, IssueLevel } from './issue.js';
 
-const directive_regex = /^\s*#\s*(\w+)(?:\s+(.*))?$/;
+const directive_regex = /^\s*#\s*([a-zA-Z]\w*)(?:\s+(.*))?$/;
 const define_regex = /^(\w+)(?:\(([^)]*)\))?\s+(.*)$/;
 
-export type Define = string | ((...args: string[]) => string);
+type DefineValue = string | number | boolean | undefined;
+
+export type Define = DefineValue | ((...args: string[]) => DefineValue);
 
 export interface Preprocessed {
 	defines: Map<string, Define>;
@@ -26,7 +28,7 @@ export interface FileInfo {
  */
 export interface PreprocessOptions {
 	log?: (info: Issue) => void;
-	file?(name: string, isPath: boolean, unit: string): FileInfo;
+	file?(name: string, startRelative: boolean, isNext: boolean, isInclude: boolean, unit: string): FileInfo;
 	unit?: string;
 	defines?: Map<string, Define>;
 	_files?: Set<string>;
@@ -47,74 +49,150 @@ function isConditionalDirective(dir: string): boolean {
 	return ['if', 'ifdef', 'ifndef', 'elif', 'elifdef', 'elifndef', 'else', 'endif'].includes(dir);
 }
 
+// Built-in macro functions and constants available to the evaluated expression.
+const builtins = {
+	__X_UNDEFINED: () => undefined,
+
+	// standard macros
+	__DATE__: new Date()
+		.toLocaleDateString('default', { month: 'short', day: '2-digit', year: 'numeric' })
+		.replace(',', '')
+		.replace(/\b0(\d)/, ' $1'),
+	__TIME__: new Date().toLocaleTimeString('default', { hourCycle: 'h23' }),
+	__STDC__: 1,
+	__STDC_VERSION__: 202311,
+
+	// kernel
+	__x86_64__: true,
+	__LITTLE_ENDIAN_BITFIELD: true,
+	__BYTE_ORDER: 1234,
+
+	// GCC stuff
+	__GNUC__: undefined,
+	__GNUC_PREREQ: (maj: number, min: number) => 0,
+	__GNUC_MINOR__: undefined,
+
+	// GCC built-ins
+	__SCHAR_MAX__: 0x7f,
+	__WCHAR_MAX__: 0x7fffffff,
+	__SHRT_MAX__: 0x7fff,
+	__INT_MAX__: 0x7fffffff,
+	__LONG_MAX__: 0x7fffffffffffffffn,
+	__LONG_LONG_MAX__: 0x7fffffffffffffffn,
+	__WINT_MAX__: 0x7fffffff,
+	__SIZE_MAX__: 0xffffffffffffffffn,
+	__PTRDIFF_MAX__: 0x7fffffffffffffffn,
+	__INTMAX_MAX__: 0x7fffffffffffffffn,
+	__UINTMAX_MAX__: 0xffffffffffffffffn,
+	__SIG_ATOMIC_MAX__: 0x7fffffff,
+	__INT8_MAX__: 0x7f,
+	__INT16_MAX__: 0x7fff,
+	__INT32_MAX__: 0x7fffffff,
+	__INT64_MAX__: 0x7fffffffffffffffn,
+	__UINT8_MAX__: 0xff,
+	__UINT16_MAX__: 0xffff,
+	__UINT32_MAX__: 0xffffffff,
+	__UINT64_MAX__: 0xffffffffffffffffn,
+	__INT_LEAST8_MAX__: 0x7f,
+	__INT_LEAST16_MAX__: 0x7fff,
+	__INT_LEAST32_MAX__: 0x7fffffff,
+	__INT_LEAST64_MAX__: 0x7fffffffffffffffn,
+	__UINT_LEAST8_MAX__: 0xff,
+	__UINT_LEAST16_MAX__: 0xffff,
+	__UINT_LEAST32_MAX__: 0xffffffff,
+	__UINT_LEAST64_MAX__: 0xffffffffffffffffn,
+	__INT_FAST8_MAX__: 0x7f,
+	__INT_FAST16_MAX__: 0x7fff,
+	__INT_FAST32_MAX__: 0x7fffffff,
+	__INT_FAST64_MAX__: 0x7fffffffffffffffn,
+	__UINT_FAST8_MAX__: 0xff,
+	__UINT_FAST16_MAX__: 0xffff,
+	__UINT_FAST32_MAX__: 0xffffffff,
+	__UINT_FAST64_MAX__: 0xffffffffffffffffn,
+	__INTPTR_MAX__: 0x7fffffffffffffffn,
+	__UINTPTR_MAX__: 0xffffffffffffffffn,
+	__WCHAR_MIN__: -0x80000000,
+	__WINT_MIN__: 0,
+	__SIG_ATOMIC_MIN__: -0x80000000,
+	__SCHAR_WIDTH__: 8,
+	__SHRT_WIDTH__: 16,
+	__INT_WIDTH__: 32,
+	__LONG_WIDTH__: 64,
+	__LONG_LONG_WIDTH__: 64,
+	__PTRDIFF_WIDTH__: 64,
+	__SIG_ATOMIC_WIDTH__: 32,
+	__SIZE_WIDTH__: 64,
+	__WCHAR_WIDTH__: 32,
+	__WINT_WIDTH__: 32,
+	__INT_LEAST8_WIDTH__: 8,
+	__INT_LEAST16_WIDTH__: 16,
+	__INT_LEAST32_WIDTH__: 32,
+	__INT_LEAST64_WIDTH__: 64,
+	__INT_FAST8_WIDTH__: 8,
+	__INT_FAST16_WIDTH__: 16,
+	__INT_FAST32_WIDTH__: 32,
+	__INT_FAST64_WIDTH__: 64,
+	__INTPTR_WIDTH__: 64,
+	__INTMAX_WIDTH__: 64,
+	__CHAR_BIT__: 8,
+
+	// clang
+	__clang_major__: undefined,
+	__clang_minor__: undefined,
+
+	// idk
+	__has_c_attribute: () => false,
+};
+
 /**
- * This function evaluates a macro expression in conditional directives.
+ * This function evaluates a expression in conditional directives.
  * It performs various replacements (numeric suffix removal, defined(...) substitution,
  * identifier replacement) and then evaluates the resulting JavaScript expression.
  *
- * @param macro The original macro expression.
+ * @param expression The original expression.
  * @param log A function used to log errors encountered during evaluation.
  * @param defines The current macro definitions.
  * @returns The evaluated result (typically a number whose truthiness is used for #if conditions).
  *
  */
-function evaluateCondition(macro: string, log: (level: IssueLevel, message: string) => void, defines: Map<string, Define>): any {
+function evaluateExpression(expression: string, log: (level: IssueLevel, message: string) => void, defines: Map<string, Define>): any {
 	// Remove suffixed numeric constants.
 	// E.g. "0UL", "123ull", "0x1FUL" become "0", "123", "0x1F".
-	macro = macro.replace(/\b((?:0x[\da-fA-F]+|\d+))([uUlL]+)\b/g, '$1');
+	expression = expression.replace(/\b((?:0x[\da-fA-F]+|\d+))([uUlL]+)\b/g, '$1').replaceAll(/\bdefined\s+(\w+)/g, (_, name) => `defined("${name}")`);
 
-	// Built-in macro functions and constants available to the evaluated expression.
-	const builtins = {
-		__X_UNDEFINED: () => 0,
-		__has_attribute: (attr: string) => false,
-		IS_ENABLED: (name: string) => true,
-		__has_builtin: () => false,
-		IS_BUILTIN: () => false,
-		__GLIBC_USE: (feature: string) => true,
-		__GNUC_PREREQ: (maj: number, min: number) => true,
-		__glibc_has_builtin: () => false,
-		__x86_64__: true,
-		__LITTLE_ENDIAN_BITFIELD: true,
-		HZ: 1000,
-		__BYTE_ORDER: 1234,
+	// EXAMPLE(X) -> EXAMPLE(`X`)
+	expression = expression.replace(/\b(\w+)\s*\(\s*(\w+(?:\s*,\s*\w+)*)\s*\)/g, (_, name, args) => {
+		const argList = args
+			.split(/\s*,\s*/)
+			.map((arg: string) => '`' + arg.replace(/`/g, '\\`') + '`')
+			.join(', ');
+		return `${name}(${argList})`;
+	});
+
+	const args: Record<string, any> = {
+		...builtins,
+		...Object.fromEntries(defines),
+		defined(macro: string) {
+			return macro in args;
+		},
 	};
-
-	// Replace defined(MACRO) and defined MACRO.
-	let replaced = macro
-		.replaceAll(/\bdefined\s*\(\s*(\w+)\s*\)/g, (_, macroName) => (defines.has(macroName) || macroName in builtins ? '1' : '0'))
-		.replaceAll(/\bdefined\s+(\w+)/g, (_, macroName) => (defines.has(macroName) || macroName in builtins ? '1' : '0'));
-
-	// First, replace identifiers used in a function-call context.
-	// The regex uses a positive lookahead to check for an open parenthesis (allowing whitespace).
-	replaced = replaced.replaceAll(/\b([A-Za-z_]\w*)(?=\s*\()/g, (match, id) => {
-		if (id in builtins) return id;
-		if (!defines.has(id)) return '__X_UNDEFINED';
-		const val = defines.get(id);
-		if (typeof val != 'string') return '1';
-		const num = Number(val);
-		return isNaN(num) ? '__X_UNDEFINED' : '1';
-	});
-
-	// Next, replace identifiers not used as function calls.
-	// The negative lookahead (?!\s*\() prevents re-matching function-call identifiers.
-	replaced = replaced.replaceAll(/\b([A-Za-z_]\w*)\b(?!\s*\()/g, (match, id) => {
-		if (id in builtins) return id;
-		if (!defines.has(id)) return '0';
-		const val = defines.get(id);
-		if (typeof val != 'string') return '1';
-		const num = Number(val);
-		return isNaN(num) ? '0' : String(num);
-	});
 
 	try {
 		// The built-in functions are passed as parameters.
 		// eslint-disable-next-line @typescript-eslint/no-implied-eval
-		const eval_expression = new Function(...Object.keys(builtins), `return (${replaced});`);
-		return eval_expression(...Object.values(builtins));
+		const eval_expression = new Function(...Object.keys(args), `return (${expression});`);
+		return eval_expression(...Object.values(args));
 	} catch (e: any) {
 		log(0, 'Failed to evaluate condition: ' + e);
-		return false;
+		return undefined;
 	}
+}
+
+function sameWhitespace(match: string) {
+	return match
+		.split('\n')
+		.map(l => ' '.repeat(l.length))
+		.join('\n');
 }
 
 /**
@@ -130,12 +208,9 @@ export function preprocess(source: string, opt: PreprocessOptions): Preprocessed
 	// Optional comment stripping.
 	if (opt.stripComments) {
 		// Remove block comments while preserving newlines.
-		source = source.replace(/\/\*[\s\S]*?\*\//g, match => {
-			const newlines = match.split('\n').length - 1;
-			return '\n'.repeat(newlines);
-		});
+		source = source.replace(/\/\*[\s\S]*?\*\//g, sameWhitespace);
 		// Remove line comments.
-		source = source.replace(/\/\/.*$/gm, '');
+		source = source.replace(/\/\/.*$/gm, sameWhitespace);
 	}
 
 	source = source.replaceAll('\\\n', '');
@@ -155,6 +230,9 @@ export function preprocess(source: string, opt: PreprocessOptions): Preprocessed
 		let column = 1,
 			position = true_position;
 		const line = lines[i];
+
+		opt.defines.set('__FILE__', opt.unit);
+		opt.defines.set('__LINE__', i + 1);
 
 		const log = (level: IssueLevel, message: string) => {
 			const issue: Issue = {
@@ -199,7 +277,7 @@ export function preprocess(source: string, opt: PreprocessOptions): Preprocessed
 		switch (directive) {
 			// Conditional Compilation Directives
 			case 'if': {
-				const conditionValue = active && evaluateCondition(text, log, opt.defines);
+				const conditionValue = active && evaluateExpression(text, log, opt.defines);
 				condStack.push({
 					parentActive: active,
 					satisfied: conditionValue,
@@ -242,7 +320,7 @@ export function preprocess(source: string, opt: PreprocessOptions): Preprocessed
 				if (!block.parentActive || block.satisfied) {
 					block.currentlyActive = false;
 				} else {
-					const conditionValue = evaluateCondition(text, log, opt.defines);
+					const conditionValue = evaluateExpression(text, log, opt.defines);
 					block.currentlyActive = conditionValue;
 					if (conditionValue) block.satisfied = true;
 				}
@@ -273,33 +351,36 @@ export function preprocess(source: string, opt: PreprocessOptions): Preprocessed
 
 			// Other Directives (processed only in active regions)
 			case 'include':
-			case 'embed': {
-				const isInclude = directive === 'include';
+			case 'embed':
+			case 'include_next':
+			case 'embed_next': {
+				const isNext = directive.endsWith('_next');
+				const isInclude = (isNext ? directive.slice(0, -5) : directive) === 'include';
 				if (!opt.file) {
 					log(0, 'Cannot import a file');
 					break;
 				}
 
 				const trimmedText = text.trim();
-				let isPath: boolean;
+				let startRelative: boolean;
 				let name: string;
 				let m: RegExpMatchArray | null;
 				if ((m = trimmedText.match(/^<([^>]+)>/))) {
 					name = m[1].trim();
-					isPath = false;
+					startRelative = false;
 				} else if ((m = trimmedText.match(/^"([^"]+)"/))) {
 					name = m[1].trim();
-					isPath = true;
+					startRelative = true;
 				} else {
 					log(1, 'Malformed directive: ' + line);
 					break;
 				}
 
-				let { contents: included, unit = name } = opt.file(name, isPath, opt.unit);
+				let { contents: included, unit = name } = opt.file(name, startRelative, isNext, isInclude, opt.unit);
 				// For #include, recursively preprocess the included file.
 				if (isInclude) {
-					if (!isPath && opt._files.has(name)) break;
-					if (!isPath) opt._files.add(name);
+					if (!startRelative && opt._files.has(name)) break;
+					if (!startRelative) opt._files.add(name);
 
 					const preprocessed = preprocess(included, { ...opt, unit });
 					included = preprocessed.text;
@@ -311,7 +392,11 @@ export function preprocess(source: string, opt: PreprocessOptions): Preprocessed
 			case 'define': {
 				const defMatch = text.match(define_regex);
 				if (!defMatch) break;
-				const [, name, rawParams, body] = defMatch;
+				const [, name, rawParams, rawBody] = defMatch;
+
+				// Replace `defined X`
+				const body = rawBody.replaceAll(/\bdefined\s+(\w+)/g, (_, name) => `defined("${name}")`);
+
 				if (!rawParams) {
 					opt.defines.set(name, body);
 					break;
@@ -322,14 +407,24 @@ export function preprocess(source: string, opt: PreprocessOptions): Preprocessed
 					.map(param => param.trim())
 					.filter(param => param.length > 0);
 
-				// Create a function-like macro.
 				opt.defines.set(name, (...args: string[]): string => {
 					let result = body;
 					for (let i = 0; i < params.length; i++) {
-						// Replace all occurrences of the parameter (using word boundaries)
-						result = result.replaceAll(new RegExp(`\\b${params[i]}\\b`, 'g'), args[i] || '');
+						result = result.replace(new RegExp(`\\b${params[i]}\\b`, 'g'), args[i] ?? '');
 					}
-					return result;
+
+					return body
+						.split('##')
+						.map(part => {
+							let token = part.trim();
+							for (let i = 0; i < params.length; i++) {
+								const param = params[i];
+								const arg = args[i] || '';
+								token = token.split(param).join(arg);
+							}
+							return token;
+						})
+						.join('');
 				});
 
 				break;
@@ -367,4 +462,31 @@ export function preprocess(source: string, opt: PreprocessOptions): Preprocessed
 		text: outputLines.join('\n'),
 		logicalSource: source,
 	};
+}
+
+export const maxMacroDepth = 25;
+
+/**
+ * Performs macro expansion on the preprocessed source text.
+ */
+export function inlineMacros(pre: Preprocessed, opt?: PreprocessOptions): void {
+	for (let depth = 0; depth < maxMacroDepth; depth++) {
+		let noMoreFn = true;
+		for (const [name, define] of pre.defines) {
+			if (typeof define != 'function') {
+				pre.text = pre.text.replace(new RegExp(`\\b${name}\\b`, 'g'), define?.toString() ?? '');
+				continue;
+			}
+
+			noMoreFn = false;
+
+			// The regex matches the macro name followed by optional whitespace and a parenthesized argument list.
+			// Note: This simple regex does not support nested parentheses.
+			pre.text = pre.text.replaceAll(new RegExp(`\\b${name}\\s*\\(([^)]*)\\)`, 'g'), (_, rawArgs) => {
+				const args = rawArgs.split(',').map((arg: string) => arg.trim());
+				return define(...args)?.toString() ?? '';
+			});
+		}
+		if (noMoreFn) return;
+	}
 }
