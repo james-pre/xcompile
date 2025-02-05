@@ -7,9 +7,9 @@ whitespace = '\s+';
 # String and character constants
 
 # Due to comments handling, we need to have a literal for the entire character constant
-character_constant = "(u8|u|U|L)?'([^'\\\n]|\\['\"\\?abfnrtv]|\\[0-7]{1,3}|\\x[0-9A-Fa-f]+|\\u[0-9A-Fa-f]{4}|\\U[0-9A-Fa-f]{8})*'";
+character_constant = "(u8|u|U|L)?'([^'\\\n]|\\['\"\\?abfnrtv]|\\[0-7]{1,3}|\\x[\dA-Fa-f]+|\\u[\dA-Fa-f]{4}|\\U[\dA-Fa-f]{8})*'";
 
-string_literal = '(u8|u|U|L)?"([^"\\\n]|\\["\'\\?abfnrtv]|\\[0-7]{1,3}|\\x[0-9A-Fa-f]+|\\u[0-9A-Fa-f]{4}|\\U[0-9A-Fa-f]{8})*"';
+string_literal = '(u8|u|U|L)?"([^"\\\n]|\\["\'\\?abfnrtv]|\\[0-7]{1,3}|\\x[\dA-Fa-f]+|\\u[\dA-Fa-f]{4}|\\U[\dA-Fa-f]{8})*"';
 
 token =
 | keyword
@@ -43,7 +43,7 @@ keyword = "alignas" | "alignof" | "auto" | "bool"
 | "_Imaginary"
 | "_Noreturn";
 
-universal_character_name = "\\u[0-9a-fA-F]{4}|\\U[0-9a-fA-F]{8}";
+universal_character_name = "\\u[\da-fA-F]{4}|\\U[\da-fA-F]{8}";
 
 constant =
 | integer_constant 
@@ -52,10 +52,10 @@ constant =
 | character_constant 
 | predefined_constant;
 
-integer_constant = "(0|[1-9]['\d]*|0[0-7]['0-7]+|0x[0-9a-f]['0-9a-f]*|0b[01]['01]*)(u(l|ll|wb)?|(l|ll|wb)u?)?";
+integer_constant = "(0|[1-9]['\d]*|0[0-7]['0-7]+|0x[\da-f]['\da-f]*|0b[01]['01]*)(u(l|ll|wb)?|(l|ll|wb)u?)?";
 ##flags integer_constant i
 
-floating_constant = "(((\d['\d]*)?\.\d['\d]*|\d['\d]*\.)(e(\+|-)?\d['\d]*)?|\d['\d]*e(\+|-)?\d['\d]*|0x(([0-9a-f]['0-9a-f]*)?\.)?[0-9a-f]['0-9a-f]*(p(\+|-)?\d['\d]*)?)(f|l|df|dd|dl)?";
+floating_constant = "(((\d['\d]*)?\.\d['\d]*|\d['\d]*\.)(e(\+|-)?\d['\d]*)?|\d['\d]*e(\+|-)?\d['\d]*|0x(([\da-f]['\da-f]*)?\.)?[\da-f]['\da-f]*(p(\+|-)?\d['\d]*)?)(f|l|df|dd|dl)?";
 ##flags floating_constant i
 
 enumeration_constant = identifier;

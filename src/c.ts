@@ -2,6 +2,7 @@ import type { Issue, IssueLevel } from './issue.js';
 
 const directive_regex = /^\s*#\s*([a-zA-Z]\w*)(?:\s+(.*))?$/;
 const define_regex = /^(\w+)(?:\(([^)]*)\))?\s+(.*)$/;
+const char_constant = /\b(u8|u|U|L)?'((?:[^'\\\n]|\\['"\\?abfnrtv]|\\[0-7]{1,3}|\\x[\dA-Fa-f]+|\\u[\dA-Fa-f]{4}|\\U[\dA-Fa-f]{8})*)'/gi;
 
 type DefineValue = string | number | boolean | undefined;
 
@@ -63,14 +64,16 @@ const builtins = {
 	__STDC_VERSION__: 202311,
 
 	// kernel
-	__x86_64__: true,
-	__LITTLE_ENDIAN_BITFIELD: true,
+	__x86_64__: 1,
+	__LITTLE_ENDIAN_BITFIELD: 1,
 	__BYTE_ORDER: 1234,
 
 	// GCC stuff
 	__GNUC__: undefined,
 	__GNUC_PREREQ: (maj: number, min: number) => 0,
 	__GNUC_MINOR__: undefined,
+	__GNUC_PATCHLEVEL__: undefined,
+	__need_size_t: true,
 
 	// GCC built-ins
 	__SCHAR_MAX__: 0x7f,
@@ -141,8 +144,50 @@ const builtins = {
 	__clang_minor__: undefined,
 
 	// idk
-	__has_c_attribute: () => false,
+	__has_c_attribute: () => 0,
+	__has_include_next: () => 0,
+	__BEGIN_DECLS: ' ',
+	__END_DECLS: ' ',
+
+	// coreutils / GNU lib
+	HAVE_WINSOCK2_H: undefined,
+	MAJOR_IN_MKDEV: undefined,
+	ENABLE_RELOCATABLE: undefined,
+	HAVE_MINMAX_IN_LIMITS_H: undefined,
+	C_CTYPE_ASCII: true,
+	GNULIB_STATAT: undefined,
 };
+
+/**
+ * Parses a C character constant (the content inside the quotes) and returns its numeric value along with its type.
+ * For multi‐character constants, only the first character is used.
+ */
+function parseCharConstant(content: string, max: 8 | 16 | 32): number {
+	if (!content.length) return 0;
+	if (content[0] != '\\') return content.charCodeAt(0);
+	if (content.startsWith("\\'")) return "'".charCodeAt(0);
+	if (content.startsWith('\\?')) return '?'.charCodeAt(0);
+
+	if (/\\([abfnrtv"\\])/.test(content)) return JSON.parse(`"${content}"`).charCodeAt(0);
+
+	const escaped_octal = content.match(/^\\([0-7]{1,3})/);
+	if (escaped_octal) return parseInt(escaped_octal[1], 8);
+
+	const escaped_hex = content.match(/^\\x([\dA-Fa-f]+)/);
+	if (escaped_hex) return parseInt(escaped_hex[1], 16);
+
+	if (max < 16) return content.charCodeAt(1);
+
+	const escaped_utf16 = content.match(/^\\u([\dA-Fa-f]{4})/);
+	if (escaped_utf16) return parseInt(escaped_utf16[1], 16);
+
+	if (max < 32) return content.charCodeAt(1);
+
+	const escaped_utf32 = content.match(/^\\U([\dA-Fa-f]{8})/);
+	if (escaped_utf32) return parseInt(escaped_utf32[1], 16);
+
+	return content.charCodeAt(1);
+}
 
 /**
  * This function evaluates a expression in conditional directives.
@@ -156,18 +201,21 @@ const builtins = {
  *
  */
 function evaluateExpression(expression: string, log: (level: IssueLevel, message: string) => void, defines: Map<string, Define>): any {
-	// Remove suffixed numeric constants.
-	// E.g. "0UL", "123ull", "0x1FUL" become "0", "123", "0x1F".
-	expression = expression.replace(/\b((?:0x[\da-fA-F]+|\d+))([uUlL]+)\b/g, '$1').replaceAll(/\bdefined\s+(\w+)/g, (_, name) => `defined("${name}")`);
-
-	// EXAMPLE(X) -> EXAMPLE(`X`)
-	expression = expression.replace(/\b(\w+)\s*\(\s*(\w+(?:\s*,\s*\w+)*)\s*\)/g, (_, name, args) => {
-		const argList = args
-			.split(/\s*,\s*/)
-			.map((arg: string) => '`' + arg.replace(/`/g, '\\`') + '`')
-			.join(', ');
-		return `${name}(${argList})`;
-	});
+	expression = expression
+		// 'e' -> 101
+		.replaceAll(char_constant, (match, prefix, content) => parseCharConstant(content, prefix == 'U' || prefix == 'L' ? 32 : prefix == 'u' ? 16 : 8).toString())
+		// 123u -> 123
+		.replaceAll(/\b(0x[\da-fA-F]+|\d+)([uUlL]+)\b/g, '$1')
+		// defined x -> defined(x)
+		.replaceAll(/\bdefined\s+(\w+)/g, (_, name) => `defined(${name})`)
+		// EXAMPLE(X) -> EXAMPLE(`X`)
+		.replaceAll(/\b(\w+)\s*\(\s*(\w+(?:\s*,\s*\w+)*)\s*\)/g, (_, name, args) => {
+			const argList = args
+				.split(/\s*,\s*/)
+				.map((arg: string) => '`' + arg.replaceAll('`', '\\`') + '`')
+				.join(', ');
+			return `${name}(${argList})`;
+		});
 
 	const args: Record<string, any> = {
 		...builtins,
@@ -466,27 +514,37 @@ export function preprocess(source: string, opt: PreprocessOptions): Preprocessed
 
 export const maxMacroDepth = 25;
 
-/**
- * Performs macro expansion on the preprocessed source text.
- */
-export function inlineMacros(pre: Preprocessed, opt?: PreprocessOptions): void {
-	for (let depth = 0; depth < maxMacroDepth; depth++) {
-		let noMoreFn = true;
-		for (const [name, define] of pre.defines) {
-			if (typeof define != 'function') {
-				pre.text = pre.text.replace(new RegExp(`\\b${name}\\b`, 'g'), define?.toString() ?? '');
-				continue;
-			}
+export interface InlineMacrosInfo {
+	name: string;
+	index: number;
+	depth?: number;
+	max: number;
+}
 
-			noMoreFn = false;
+function inlineMacrosString(text: string, defines: Map<string, Define>, opt?: PreprocessOptions, depth: number = 0): string {
+	if (depth >= maxMacroDepth) return text;
 
-			// The regex matches the macro name followed by optional whitespace and a parenthesized argument list.
-			// Note: This simple regex does not support nested parentheses.
-			pre.text = pre.text.replaceAll(new RegExp(`\\b${name}\\s*\\(([^)]*)\\)`, 'g'), (_, rawArgs) => {
-				const args = rawArgs.split(',').map((arg: string) => arg.trim());
-				return define(...args)?.toString() ?? '';
-			});
-		}
-		if (noMoreFn) return;
+	for (const [name, define] of defines) {
+		if (typeof define == 'function') continue;
+		const regex = new RegExp(`\\b${name}\\b`, 'g');
+		text = text.replaceAll(regex, define?.toString() ?? '');
 	}
+
+	for (const [name, define] of defines) {
+		if (typeof define != 'function') continue;
+		const regex = new RegExp(`\\b${name}\\s*\\(([^)]*)\\)`, 'g');
+		text = text.replaceAll(regex, (_, rawArgs) => {
+			const args = rawArgs.split(',').map((arg: string) => arg.trim());
+			// Expand the macro call.
+			let expansion = define(...args)?.toString() ?? '';
+			// Recursively inline macros in the returned expansion.
+			expansion = inlineMacrosString(expansion, defines, opt, depth + 1);
+			return expansion;
+		});
+	}
+	return text;
+}
+
+export function inlineMacros(pre: Preprocessed, opt?: PreprocessOptions): void {
+	pre.text = inlineMacrosString(pre.text, pre.defines, opt, 0);
 }

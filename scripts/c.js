@@ -61,7 +61,7 @@ const _includesReversed = options.include.toReversed();
 
 let n_includes = 0;
 
-const processed = preprocess(source, {
+const pp_options = {
 	log(issue) {
 		console.error(stringifyIssue(issue, { colors: true, trace }));
 	},
@@ -96,16 +96,19 @@ const processed = preprocess(source, {
 	ignoreDirectiveErrors: options['ignore-directive-errors'],
 	ignoreDirectiveWarnings: options['ignore-directive-warnings'],
 	stripComments: true,
-});
+};
+
+const processed = preprocess(source, pp_options);
+
+inlineMacros(processed);
 
 if (options['preprocess-only']) {
 	try {
 		const output = options.output ?? input + '.out';
 		writeFileSync(output, processed.text.replaceAll(/^\s*$/gm, '').replaceAll(/\n{2,}/g, '\n\n'));
+		process.exit(0);
 	} catch (e) {
 		console.error('Failed to write output file:', e);
 		process.exit(1);
 	}
 }
-
-inlineMacros(processed);
