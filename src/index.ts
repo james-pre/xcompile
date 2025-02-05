@@ -1,8 +1,4 @@
-export * as bnf from './bnf.js';
 export * as clang from './clang.js';
-export * as config from './config.js';
 export * from './issue.js';
-export * as ir from './xir.js';
-export * from './parser.js';
-export * from './tokens.js';
 export * as ts from './typescript.js';
+export * as xir from './xir.js';

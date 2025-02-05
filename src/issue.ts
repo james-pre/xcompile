@@ -1,4 +1,19 @@
-import { locationText, type Location } from './tokens.js';
+/**
+ * A location in source text
+ */
+export interface Location {
+	line: number;
+	column: number;
+	position: number;
+	/**
+	 * The file, internal module, shared object, etc.
+	 */
+	unit?: string;
+}
+
+export function locationText(loc: Location): string {
+	return `${loc.unit ? loc.unit + ':' : ''}${loc.line}:${loc.column}`;
+}
 
 export interface Issue {
 	location?: Location;
