@@ -59,7 +59,9 @@ export function compress(config: Config): Config {
 		...config,
 		definitions: config.definitions.map(def => ({
 			...def,
-			pattern: def.pattern.map(part => (typeof part === 'string' ? part : part.type == 'required' ? part.kind : part)),
+			pattern: def.pattern.map(part =>
+				typeof part === 'string' ? part : part.type == 'required' ? part.kind : part
+			),
 		})),
 	};
 }

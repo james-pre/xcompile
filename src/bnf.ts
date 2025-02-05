@@ -247,7 +247,8 @@ function configProcessExpression($: CreateConfigContext, expression: Node, rule:
 					const [subPattern, isAlternation] = configProcessExpression($sub, inner, rule);
 
 					// Check if subPattern contains another rule name, if so, no need to create a new group
-					const existing = subPattern.length == 1 && subPattern[0].kind !== 'string' ? subPattern[0].kind : null;
+					const existing =
+						subPattern.length == 1 && subPattern[0].kind !== 'string' ? subPattern[0].kind : null;
 					if (existing) {
 						pattern.push({ kind: existing, type });
 						break;
@@ -314,7 +315,10 @@ function configProcessRule($: CreateConfigContext, rule: Node): void {
 			const [, { kind, text }] = valueNode.children;
 
 			if (kind == 'identifier') {
-				$.logger(valueNode)[1](1, 'Using identifiers for attribute values is not supported yet (value set to null)');
+				$.logger(valueNode)[1](
+					1,
+					'Using identifiers for attribute values is not supported yet (value set to null)'
+				);
 			}
 
 			value = kind == 'string' ? JSON.parse(text) : kind == 'number' ? parseFloat(text) : null;
@@ -341,7 +345,12 @@ function configProcessRule($: CreateConfigContext, rule: Node): void {
 	const maybeLiteral = pattern[0].kind;
 
 	const index = $.config.literals.findIndex(l => l.name == maybeLiteral);
-	if (index != -1 && pattern.length == 1 && pattern[0].type == 'required' && $.config.literals[index].pattern.source.slice(1) == pattern[0].kind) {
+	if (
+		index != -1 &&
+		pattern.length == 1 &&
+		pattern[0].type == 'required' &&
+		$.config.literals[index].pattern.source.slice(1) == pattern[0].kind
+	) {
 		try {
 			const pattern = new RegExp('^' + maybeLiteral);
 			$.config.literals.splice(index, 1, { name, pattern });

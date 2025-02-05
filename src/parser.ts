@@ -214,7 +214,9 @@ export function parse(options: ParseOptions): AST {
 		const definition = options.definitions.find(def => def.name === kind);
 		if (!definition) throw _issue(0, `Definition for "${kind}" not found`);
 
-		const pattern = definition.pattern.map(part => (typeof part === 'string' ? { kind: part, type: 'required' } : part));
+		const pattern = definition.pattern.map(part =>
+			typeof part === 'string' ? { kind: part, type: 'required' } : part
+		);
 
 		switch (definition.type) {
 			case 'alternation': {

@@ -58,7 +58,13 @@ export function tokenize(source: string, definitions: Iterable<TokenDefinition>,
 		}
 
 		if (!token) {
-			throw { location: { line, column, position, unit }, source, message: 'Unexpected token: ' + source[position], level: 0, stack: new Error().stack } satisfies Issue;
+			throw {
+				location: { line, column, position, unit },
+				source,
+				message: 'Unexpected token: ' + source[position],
+				level: 0,
+				stack: new Error().stack,
+			} satisfies Issue;
 		}
 
 		tokens.push(token);

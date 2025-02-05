@@ -9,7 +9,8 @@
 	"bin": {
 		"xcompile-bnf": "scripts/bnf.js",
 		"xcompile-dump": "scripts/dump.js",
-		"xcompile-c-pp": "scripts/c.js"
+		"xcompile-c": "scripts/c.js",
+		"xcompile-c-pp": "scripts/c-pp.js"
 	},
 	"files": [
 		"dist",
