@@ -514,13 +514,6 @@ export function preprocess(source: string, opt: PreprocessOptions): Preprocessed
 
 export const maxMacroDepth = 25;
 
-export interface InlineMacrosInfo {
-	name: string;
-	index: number;
-	depth?: number;
-	max: number;
-}
-
 function inlineMacrosString(text: string, defines: Map<string, Define>, opt?: PreprocessOptions, depth: number = 0): string {
 	if (depth >= maxMacroDepth) return text;
 
