@@ -115,7 +115,7 @@ function parseType(node: Node): xir.Type {
 		case 'EnumType':
 		case 'RecordType':
 		case 'TypedefType':
-			return { kind: 'plain', text: node.type.qualType };
+			return parseXIRType(node.type.qualType);
 		case 'ParenType':
 			return parseType(node.inner![0]);
 		case 'QualType':
@@ -155,18 +155,20 @@ const _typeMappings = {
 
 // Convert strings into XIR types
 function parseXIRBaseType(type: string): string {
+	type = type.trim();
 	if (xir.isBuiltin(type)) return type;
 	if (type in _typeMappings) return _typeMappings[type as keyof typeof _typeMappings];
 	return type;
 }
 
 function parseXIRType(type: string): xir.Type {
+	type = type.trim();
 	if (type.startsWith('const ')) {
 		return { kind: 'qual', qualifiers: 'const', inner: parseXIRType(type.slice(6)) };
 	}
 
 	if (type.includes('*')) {
-		return { kind: 'ref', to: parseXIRType(type.replace('*', '')) };
+		return { kind: 'ref', to: parseXIRType(type.replace(/\s*\*\s*/, '')) };
 	}
 
 	if (type.at(-1) != ']') return { kind: 'plain', text: parseXIRBaseType(type) };
@@ -487,7 +489,7 @@ export function* parse(node: Node): IterableIterator<xir.Unit> {
 			return;
 		}
 		case 'CStyleCastExpr':
-			yield { kind: 'cast', type: { kind: 'plain', text: node.type.qualType }, value: _parseFirst(node) };
+			yield { kind: 'cast', type: parseXIRType(node.type.qualType), value: _parseFirst(node) };
 			return;
 		case 'DefaultStmt':
 			yield { kind: 'default' };
@@ -596,7 +598,11 @@ export function* parse(node: Node): IterableIterator<xir.Unit> {
 			yield { kind: 'label', name: '_' + node.declId };
 			return;
 		case 'DeclRefExpr':
-			yield* parse(node.referencedDecl);
+			yield {
+				kind: 'value',
+				content: node.referencedDecl.name,
+				type: parseXIRType(node.referencedDecl.type.qualType),
+			};
 			return;
 		case 'MemberExpr':
 			yield {

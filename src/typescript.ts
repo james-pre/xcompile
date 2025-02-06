@@ -40,7 +40,7 @@ function emitType(type: xir.Type): string {
 }
 
 function emitBlock(block: xir.Unit[]): string {
-	return `{${block.map(emit).join(';')}}`;
+	return `{\n${block.map(emit).join(';\n')}\n}`;
 }
 
 function emitList(expr: xir.Unit[]): string {
@@ -130,9 +130,9 @@ export function emit(u: xir.Unit): string {
 		case 'enum':
 			return `enum ${u.name} ${emitBlock(u.fields)}`;
 		case 'type_alias':
-			return `type ${u.name} = ${emitType(u.value)};`;
+			return `type ${u.name} = ${emitType(u.value)};\n`;
 		case 'declaration':
-			return `${xir.typeHasQualifier(u.type, 'const') ? 'const' : 'let'} ${u.name}: ${emitType(u.type)} ${u.initializer === undefined ? '' : ' = ' + emit(u.initializer)};`;
+			return `${xir.typeHasQualifier(u.type, 'const') ? 'const' : 'let'} ${u.name}: ${emitType(u.type)} ${u.initializer === undefined ? '' : ' = ' + emit(u.initializer)};\n`;
 		case 'field':
 		case 'parameter':
 			return `${u.name}: ${emitType(u.type)} ${!u.initializer ? '' : ' = ' + emit(u.initializer)}`;
