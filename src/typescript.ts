@@ -29,17 +29,10 @@ function emitList(expr: xir.Unit[], noParans: boolean = false): string {
 	return (noParans ? '' : '(') + expr.map(emit).join(', ') + (noParans ? '' : ')');
 }
 
-function _baseDecorator(typename: string): string {
-	return xir.isBuiltin(typename)
-		? xir.isNumeric(typename)
-			? '@t.' + typename
-			: '@t.uint8'
-		: `@member(${typename.replaceAll(' ', '_')})`;
-}
-
 /** Utilium type decorator for class member */
 function emitDecorator(type: xir.Type, length?: number): string {
 	if (!type) return '/* [!] missing type */';
+	if (type.kind == 'plain' && type.raw) type = type.raw;
 	switch (type.kind) {
 		case 'plain':
 			return xir.isBuiltin(type.text)
@@ -76,6 +69,8 @@ type float128 = number;
 type Ref<T> = T;
 `;
 
+const _outsideFields = ['struct', 'class', 'union'];
+
 export function emit(u: xir.Unit): string {
 	switch (u.kind) {
 		case 'function':
@@ -108,7 +103,6 @@ export function emit(u: xir.Unit): string {
 			if (u.operator == '&') return `$__ref${emitList(u.expression)}`;
 			if (u.operator == ('__extension__' as any))
 				return `/* __extension__ */ (() => { ${u.expression.slice(0, -1).map(emit).join(';')}; return ${emit(u.expression.at(-1)!)} })()`;
-			//	return `/* __extension__ */ (() => { $stmt = ${emitList(u.expression, true)}})()`;
 			return `${u.operator} ${emitList(u.expression)}`;
 		case 'assignment':
 		case 'binary':
@@ -138,7 +132,13 @@ export function emit(u: xir.Unit): string {
 			return `(${emit(u.value)} as ${emitType(u.type)})`;
 		case 'struct':
 		case 'class':
-			return `@struct() \n class struct_${u.name} {${u.fields.map(field => emitDecorator(field.type) + ' ' + emit(field)).join(';\n')}}\n`;
+		case 'union': {
+			return `${u.subRecords.map(emit).join('\n')}@struct(${
+				u.kind == 'union' ? '{ isUnion: true }' : ''
+			}) \nclass ${u.kind}_${u.name} {${u.fields
+				.map(field => emitDecorator(field.type) + ' ' + emit(field))
+				.join(';\n')}}\n`;
+		}
 		case 'enum':
 			return `enum ${u.name} ${emitBlock(u.fields, true)}`;
 		case 'type_alias':
@@ -149,12 +149,10 @@ export function emit(u: xir.Unit): string {
 			return `${u.name} ${u.value === undefined ? '' : ' = ' + emit(u.value)},\n`;
 		case 'field':
 		case 'parameter':
-			return `${u.name}: ${emitType(u.type)} ${!u.initializer ? '' : ' = ' + emit(u.initializer)}`;
+			return `${u.name ?? 'undefined_' + u.index}: ${emitType(u.type)} ${!u.initializer ? '' : ' = ' + emit(u.initializer)}`;
 		case 'value':
 			// eslint-disable-next-line @typescript-eslint/no-base-to-string
 			return `${typeof u.content == 'string' ? u.content : u.content.map ? u.content.map(({ field, value }) => field + ': ' + emit(value)).join(';\n') : u.content.toString()}`;
-		case 'union':
-			return `/* UNSUPPORTED: union ${u.name} */`;
 		case 'comment':
 			return `/* ${u.text} */`;
 	}

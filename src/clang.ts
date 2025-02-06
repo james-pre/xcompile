@@ -163,6 +163,7 @@ const _typeMappings = {
 	'unsigned long long int': 'uint64',
 	float: 'float32',
 	double: 'float64',
+	'long double': 'float128',
 };
 
 // Convert strings into XIR types
@@ -173,20 +174,24 @@ function parseXIRBaseType(type: string): string {
 	return type;
 }
 
-const _type_anonymous = /(unnamed \w+|anonymous) at /i;
+const _type_anonymous = /(?:unnamed(?: \w+)?|anonymous) at /i;
 
 const _type_function = /([^(\s]+)\s+\(\)\s*\((.*)\)/i;
 
-function parseXIRType(type: string | Node, id?: string): xir.Type {
+function parseXIRType(type: string | Node, raw?: string, alt?: string, _isRaw: boolean = false): xir.Type {
 	if (!type) return { kind: 'plain', text: 'unknown' };
 
-	if (typeof type != 'string') return parseXIRType(type.type?.qualType, type.id);
+	if (typeof type != 'string') {
+		const _ = type.type ?? {};
+		return parseXIRType(_.qualType, _.desugaredQualType, type.name ?? '_' + type.id);
+	}
 
 	type = type.trim();
+	raw ??= type;
 
-	const [, name] = type.match(_type_anonymous) ?? [];
+	const match = type.match(_type_anonymous);
 
-	if (name) type = name.replaceAll(' ', '_') + (id ? '_' + id : '');
+	if (match) type = alt ?? '';
 
 	const [, fn_returns, fn_args] = type.match(_type_function) ?? [];
 
@@ -210,11 +215,13 @@ function parseXIRType(type: string | Node, id?: string): xir.Type {
 		};
 	}
 
-	if (type.at(-1) != ']') return { kind: 'plain', text: parseXIRBaseType(type) };
+	const _raw = _isRaw ? undefined : parseXIRType(raw, raw, alt, true);
+
+	if (type.at(-1) != ']') return { kind: 'plain', text: parseXIRBaseType(type), raw: _raw };
 
 	const [base, ...lengths] = type.replaceAll(']', '').split('[');
 
-	let current: xir.Type = { kind: 'plain', text: parseXIRBaseType(base) };
+	let current: xir.Type = { kind: 'plain', text: parseXIRBaseType(base), raw: _raw };
 
 	for (const length of lengths.map(Number)) {
 		current = { kind: 'const_array', length, element: current };
@@ -224,7 +231,7 @@ function parseXIRType(type: string | Node, id?: string): xir.Type {
 }
 
 function parseTypedef(node: Declaration): xir.Type {
-	if (!node.inner) return { kind: 'plain', text: node.type.qualType };
+	if (!node.inner) return parseXIRType(node);
 	return parseType(node.inner[0]);
 }
 
@@ -562,17 +569,35 @@ export function* parse(node: Node): IterableIterator<xir.Unit> {
 			};
 			return;
 		case 'EnumDecl':
-		case 'RecordDecl':
+		case 'RecordDecl': {
 			if (node.kind == 'RecordDecl' && !node.completeDefinition) {
 				// _note('Skipping incomplete definition')
 				return;
 			}
+
+			const subRecords: xir.RecordLike[] = [];
+			let lastSubRecord: number | undefined;
+
 			yield {
 				kind: node.kind == 'EnumDecl' ? 'enum' : node.tagUsed!,
 				name: node.name ?? '_' + node.id,
-				fields: node.inner!.flatMap(node => [...parse(node)] as xir.Declaration[]),
+				subRecords,
+				fields: node
+					.inner!.flatMap((node, i) => {
+						if (node.kind != 'RecordDecl') {
+							if (i - 1 === lastSubRecord) {
+								node.type.qualType = subRecords.at(-1)?.name ?? node.type.qualType;
+							}
+							return [...parse(node)];
+						}
+						subRecords.push(...(parse(node) as IterableIterator<xir.RecordLike>));
+						lastSubRecord = i;
+						return [];
+					})
+					.map((u, index) => ({ ...u, index })) as xir.Declaration[],
 			};
 			return;
+		}
 		case 'EnumConstantDecl':
 			yield {
 				kind: 'enum_field',
@@ -683,11 +708,8 @@ export function* parse(node: Node): IterableIterator<xir.Unit> {
 						kind: 'value',
 						type: {
 							kind: 'function',
-							returns: { kind: 'plain', text: 'void' },
-							args: [
-								{ kind: 'plain', text: 'bool' },
-								{ kind: 'plain', text: 'string' },
-							],
+							returns: parseXIRType('void'),
+							args: [parseXIRType('bool'), parseXIRType('string')],
 						},
 						content: '$__assert',
 					},
@@ -717,11 +739,7 @@ export function* parse(node: Node): IterableIterator<xir.Unit> {
 				primary: [
 					{
 						kind: 'value',
-						type: {
-							kind: 'function',
-							returns: { kind: 'plain', text: 'uint64' },
-							args: [{ kind: 'plain', text: 'any' }],
-						},
+						type: { kind: 'function', returns: parseXIRType('uint64'), args: [parseXIRType('any')] },
 						content: node.name!,
 					},
 				],

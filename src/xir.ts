@@ -27,8 +27,13 @@ export function isBuiltin(type: string): type is BuiltinType {
 
 export type TypeQualifier = string;
 
+export interface RawType {
+	text: string;
+	lengths?: number[];
+}
+
 export type Type =
-	| { kind: 'plain'; text: string }
+	| { kind: 'plain'; text: string; raw?: Type }
 	| { kind: 'const_array'; length: number; element: Type }
 	| { kind: 'ref'; to: Type; restricted?: boolean }
 	| { kind: 'function'; returns: Type; args: Type[] }
@@ -142,6 +147,7 @@ export interface Declaration {
 	type: Type;
 	initializer?: Value;
 	storage?: StorageClass;
+	index?: number;
 }
 
 export interface Function {
@@ -151,6 +157,13 @@ export interface Function {
 	body: Unit[];
 	name: string;
 	storage?: StorageClass;
+}
+
+export interface RecordLike {
+	kind: 'struct' | 'class' | 'union' | 'enum';
+	name?: string;
+	fields: Declaration[];
+	subRecords: RecordLike[];
 }
 
 export type Unit =
@@ -166,7 +179,7 @@ export type Unit =
 	| { kind: 'goto'; target: string }
 	| { kind: 'label'; name: string }
 	| { kind: 'break' | 'continue'; target?: string }
-	| { kind: 'struct' | 'class' | 'union' | 'enum'; name?: string; fields: Declaration[] }
+	| RecordLike
 	| { kind: 'return'; value: Expression[] }
 	| { kind: 'switch'; expression: Expression[]; body: Unit[] }
 	| { kind: 'type_alias'; name: string; value: Type }
