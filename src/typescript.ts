@@ -23,22 +23,20 @@ function _baseType(typename: string): string {
 }
 
 function emitType(type: xir.Type): string {
-	let base = '';
-
 	switch (type.kind) {
 		case 'plain':
-			base = _baseType(type.text);
-			break;
+			return _baseType(type.text);
 		case 'const_array':
-			base = `Tuple<${emitType(type.element)}, ${type.length}>`;
-			break;
+			return `Tuple<${emitType(type.element)}, ${type.length}>`;
 		case 'ref':
-			base = `Ref<${emitType(type.to)}>`;
-			break;
+			return `Ref<${emitType(type.to)}>`;
+		case 'function':
+			return `((${type.args.map(emitType).join(', ')}) => ${emitType(type.returns)})`;
+		case 'qual':
+			return type.qualifiers == 'const'
+				? `Readonly<${emitType(type.inner)}>`
+				: `__Qual<${emitType(type.inner)}, '${type.qualifiers}'>`;
 	}
-
-	if (type.constant) base = `Readonly<${base}>`;
-	return base;
 }
 
 function emitBlock(block: xir.Unit[]): string {
@@ -63,6 +61,10 @@ function emitDecorator(type: xir.Type): string {
 			return _baseDecorator(type.element.text);
 		case 'ref':
 			return '/* ref */ ' + emitDecorator(type.to);
+		case 'qual':
+			return emitDecorator(type.inner);
+		case 'function':
+			throw 'Functions can not be struct members';
 	}
 }
 
@@ -71,11 +73,9 @@ export function emit(u: xir.Unit): string {
 		case 'function':
 			return `function ${u.name} ${emitList(u.parameters)}: ${emitType(u.returns)}\n${emitBlock(u.body)}`;
 		case 'return':
-			return 'return ' + emit(u.value);
+			return 'return ' + emitList(u.value);
 		case 'if':
-			return `if ${emitList(u.condition)}
-				${emitBlock(u.body)} ${u.elseif.map(elseif => `else if ${emitList(u.condition)}\n${emitBlock(elseif.body)}`).join('\n')}
-				${!u.else ? '' : 'else ' + emitBlock(u.else)}`;
+			return `if ${emitList(u.condition)}\n${emitBlock(u.body)} ${!u.else ? '' : '\nelse ' + (u.else[0].kind == 'if' ? emitBlock(u.else) : emitBlock(u.else))}`;
 		case 'while':
 			return u.isDo
 				? `do ${emitBlock(u.body)} while ${emitList(u.condition)}`
@@ -84,22 +84,25 @@ export function emit(u: xir.Unit): string {
 			return `for (${emitList(u.init)}; ${emitList(u.condition)}; ${emitList(u.action)}) ${emitBlock(u.body)}`;
 		case 'switch':
 			return `switch ${emitList(u.expression)} ${emitBlock(u.body)}`;
+		case 'default':
+			return 'default';
 		case 'case':
-			return `${u.matches == 'default' ? 'default:' : `case ${emit(u.matches)}:`}\n${emitBlock(u.body)}`;
+			return `case ${emit(u.matches)}:`;
 		case 'break':
 		case 'continue':
 		case 'goto':
-			return u.name ? u.kind + ' ' + u.name : u.kind;
+			return u.target ? u.kind + ' ' + u.target : u.kind;
 		case 'label':
 			return u.name + ':';
 		case 'unary':
 			return `${u.operator} ${emit(u.expression)}`;
+		case 'assignment':
 		case 'binary':
-			return `${emit(u.left)} ${u.operator} ${emit(u.right)}`;
+			return `${emitList(u.left)} ${u.operator} ${emitList(u.right)} `;
 		case 'ternary':
 			return `${emitList(u.condition)} ? ${emitList(u.true)} : ${emitList(u.false)}`;
 		case 'postfixed': {
-			const primary = emit(u.primary);
+			const primary = emitList(u.primary);
 			switch (u.post.type) {
 				case 'increment':
 					return primary + '++';
@@ -124,10 +127,8 @@ export function emit(u: xir.Unit): string {
 			return `@struct() \n class struct_${u.name} {${u.fields.map(field => emitDecorator(field.type) + ' ' + emit(field)).join(';\n')}}`;
 		case 'type_alias':
 			return `type ${u.name} = ${emitType(u.value)};`;
-		case 'assignment':
-			return `${emit(u.left)} ${u.operator} ${emit(u.right)};`;
 		case 'declaration':
-			return `${u.type.constant ? 'const' : 'let'} ${u.name}: ${emitType(u.type)} ${u.initializer === undefined ? '' : ' = ' + emit(u.initializer)};`;
+			return `${xir.typeHasQualifier(u.type, 'const') ? 'const' : 'let'} ${u.name}: ${emitType(u.type)} ${u.initializer === undefined ? '' : ' = ' + emit(u.initializer)};`;
 		case 'field':
 		case 'parameter':
 			return `${u.name}: ${emitType(u.type)} ${!u.initializer ? '' : ' = ' + emit(u.initializer)}`;
@@ -135,6 +136,8 @@ export function emit(u: xir.Unit): string {
 			return `${typeof u.content == 'string' ? u.content : u.content.map(({ field, value }) => field + ': ' + emit(value)).join(';\n')}`;
 		case 'union':
 			return `/* UNSUPPORTED: union ${u.name} */`;
+		case 'comment':
+			return `/* ${u.text} */`;
 	}
 }
 

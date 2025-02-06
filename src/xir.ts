@@ -25,17 +25,29 @@ export function isBuiltin(type: string): type is BuiltinType {
 	return isNumeric(type) || type == 'void' || type == 'bool';
 }
 
-interface _Type {
-	kind: string;
-	constant?: boolean;
-}
+export type TypeQualifier = string;
 
-export type Type = _Type &
-	(
-		| { kind: 'plain'; text: string }
-		| { kind: 'const_array'; length: number; element: Type }
-		| { kind: 'ref'; to: Type }
-	);
+export type Type =
+	| { kind: 'plain'; text: string }
+	| { kind: 'const_array'; length: number; element: Type }
+	| { kind: 'ref'; to: Type }
+	| { kind: 'function'; returns: Type; args: Type[] }
+	| { kind: 'qual'; qualifiers: TypeQualifier; inner: Type };
+
+export function typeHasQualifier(type: Type, qual: TypeQualifier): boolean {
+	switch (type.kind) {
+		case 'function':
+			return typeHasQualifier(type.returns, qual);
+		case 'plain':
+			return false;
+		case 'const_array':
+			return typeHasQualifier(type.element, qual);
+		case 'ref':
+			return typeHasQualifier(type.to, qual);
+		case 'qual':
+			return type.qualifiers == qual;
+	}
+}
 
 export type RecordInitializer = { field: string; value: Value }[];
 
@@ -51,12 +63,11 @@ export type Postfix =
 	| { type: 'bracket_access'; key: Expression[] }
 	| { type: 'call'; args: Expression[] }
 	| { type: 'access' | 'access_ref'; key: string }
-	| { type: 'increment' }
-	| { type: 'decrement' };
+	| { type: 'increment' | 'decrement' };
 
 export interface Postfixed {
 	kind: 'postfixed';
-	primary: Expression;
+	primary: Expression[];
 	post: Postfix;
 }
 
@@ -97,8 +108,15 @@ export interface Binary {
 		| '>>'
 		| '<'
 		| '>';
-	left: Expression;
-	right: Expression;
+	left: Expression[];
+	right: Expression[];
+}
+
+export interface Assignment {
+	kind: 'assignment';
+	operator: '=' | '*=' | '/=' | '%=' | '+=' | '-=' | '&=' | '^=' | '|=' | '>>=' | '<<=';
+	left: Expression[];
+	right: Expression[];
 }
 
 export interface Ternary {
@@ -108,49 +126,10 @@ export interface Ternary {
 	false: Expression[];
 }
 
-export interface Assignment {
-	kind: 'assignment';
-	operator: '=' | '*=' | '/=' | '%=' | '+=' | '-=' | '&=' | '^=' | '|=' | '>>=' | '<<=';
-	left: Expression;
-	right: Expression;
-}
-
 export type Expression = Assignment | Unary | Binary | Ternary | Cast | Postfixed | Value;
 
-export type ConstantExpr = Exclude<Expression, Assignment>;
-
-export interface Case {
-	kind: 'case';
-	matches: ConstantExpr | 'default';
-	body: Unit[];
-}
-
-export interface Switch {
-	kind: 'switch';
-	expression: Expression[];
-	body: Case[];
-}
-
-export interface For {
-	kind: 'for';
-	init: Expression[];
+export interface Conditional {
 	condition: Expression[];
-	action: Expression[];
-	body: Unit[];
-}
-
-export interface While {
-	kind: 'while';
-	isDo: boolean;
-	condition: Expression[];
-	body: Unit[];
-}
-
-export interface If {
-	kind: 'if';
-	condition: Expression[];
-	elseif: { condition: Expression[]; body: Unit[] }[];
-	else?: Unit[];
 	body: Unit[];
 }
 
@@ -169,38 +148,20 @@ export interface Function {
 	name: string;
 }
 
-export interface Record {
-	kind: 'struct' | 'class' | 'union';
-	name?: string;
-	fields: Declaration[];
-}
-
-export interface Labeled {
-	kind: 'break' | 'continue' | 'label' | 'goto';
-	name: string;
-}
-
-export interface Return {
-	kind: 'return';
-	value: Expression;
-}
-
-export interface TypeAlias {
-	kind: 'type_alias';
-	name: string;
-	value: Type;
-}
-
 export type Unit =
-	| Function
-	| If
-	| While
-	| For
-	| Case
-	| Switch
+	| { kind: 'case'; matches: Expression }
+	| { kind: 'default' }
+	| { kind: 'comment'; text: string }
+	| Declaration
 	| Expression
-	| Record
-	| Labeled
-	| Return
-	| TypeAlias
-	| Declaration;
+	| ({ kind: 'for'; init: Expression[]; action: Expression[] } & Conditional)
+	| Function
+	| ({ kind: 'if'; else?: Unit[] } & Conditional)
+	| { kind: 'goto'; target: string }
+	| { kind: 'label'; name: string }
+	| { kind: 'break' | 'continue'; target?: string }
+	| { kind: 'struct' | 'class' | 'union'; name?: string; fields: Declaration[] }
+	| { kind: 'return'; value: Expression[] }
+	| { kind: 'switch'; expression: Expression[]; body: Unit[] }
+	| { kind: 'type_alias'; name: string; value: Type }
+	| ({ kind: 'while'; isDo: boolean } & Conditional);
