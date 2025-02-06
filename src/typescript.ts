@@ -95,7 +95,9 @@ export function emit(u: xir.Unit): string {
 		case 'label':
 			return u.name + ':';
 		case 'unary':
-			return `${u.operator} ${emit(u.expression)}`;
+			if (u.operator == '*') return `$__deref(${emitList(u.expression)})`;
+			if (u.operator == '&') return `$__ref(${emitList(u.expression)})`;
+			return `${u.operator} ${emitList(u.expression)}`;
 		case 'assignment':
 		case 'binary':
 			return `${emitList(u.left)} ${u.operator} ${emitList(u.right)} `;
@@ -125,6 +127,8 @@ export function emit(u: xir.Unit): string {
 		case 'struct':
 		case 'class':
 			return `@struct() \n class struct_${u.name} {${u.fields.map(field => emitDecorator(field.type) + ' ' + emit(field)).join(';\n')}}`;
+		case 'enum':
+			return `enum ${u.name} ${emitBlock(u.fields)}`;
 		case 'type_alias':
 			return `type ${u.name} = ${emitType(u.value)};`;
 		case 'declaration':

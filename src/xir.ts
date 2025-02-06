@@ -79,8 +79,8 @@ export interface Cast {
 
 export interface Unary {
 	kind: 'unary';
-	operator: '++' | '--' | '~' | '!' | '+' | '-';
-	expression: Expression;
+	operator: '++' | '--' | '~' | '!' | '+' | '-' | '&' | '*';
+	expression: Expression[];
 }
 
 export interface Binary {
@@ -160,7 +160,7 @@ export type Unit =
 	| { kind: 'goto'; target: string }
 	| { kind: 'label'; name: string }
 	| { kind: 'break' | 'continue'; target?: string }
-	| { kind: 'struct' | 'class' | 'union'; name?: string; fields: Declaration[] }
+	| { kind: 'struct' | 'class' | 'union' | 'enum'; name?: string; fields: Declaration[] }
 	| { kind: 'return'; value: Expression[] }
 	| { kind: 'switch'; expression: Expression[]; body: Unit[] }
 	| { kind: 'type_alias'; name: string; value: Type }

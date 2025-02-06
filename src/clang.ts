@@ -161,6 +161,14 @@ function parseXIRBaseType(type: string): string {
 }
 
 function parseXIRType(type: string): xir.Type {
+	if (type.startsWith('const ')) {
+		return { kind: 'qual', qualifiers: 'const', inner: parseXIRType(type.slice(6)) };
+	}
+
+	if (type.includes('*')) {
+		return { kind: 'ref', to: parseXIRType(type.replace('*', '')) };
+	}
+
 	if (type.at(-1) != ']') return { kind: 'plain', text: parseXIRBaseType(type) };
 
 	const [base, ...lengths] = type.replaceAll(']', '').split('[');
@@ -357,6 +365,10 @@ export type Node =
 	| UnaryOperator
 	| Value;
 
+function _parseFirst<T extends xir.Unit>(node: Node): T {
+	return [...parse(node.inner![0])][0] as T;
+}
+
 export function* parse(node: Node): IterableIterator<xir.Unit> {
 	switch (node.kind) {
 		case 'BuiltinType':
@@ -440,7 +452,7 @@ export function* parse(node: Node): IterableIterator<xir.Unit> {
 			return;
 		}
 		case 'CaseStmt': {
-			yield { kind: 'case', matches: [...parse(node.inner[0])][0] as xir.Expression };
+			yield { kind: 'case', matches: _parseFirst(node) };
 			for (const child of node.inner.slice(1)) {
 				yield* parse(child);
 			}
@@ -454,8 +466,10 @@ export function* parse(node: Node): IterableIterator<xir.Unit> {
 		// fallthrough
 		case 'CompoundStmt':
 		case 'CompoundLiteralExpr':
+		case 'DeclStmt':
 		case 'ImplicitCastExpr':
 		case 'InitListExpr':
+		case 'ParenExpr':
 		case 'TranslationUnitDecl':
 		case 'StmtExpr':
 			for (const inner of node.inner ?? []) {
@@ -473,16 +487,7 @@ export function* parse(node: Node): IterableIterator<xir.Unit> {
 			return;
 		}
 		case 'CStyleCastExpr':
-			yield {
-				kind: 'cast',
-				type: { kind: 'plain', text: node.type.qualType },
-				value: [...parse(node.inner![0])][0] as xir.Expression,
-			};
-			return;
-		case 'DeclStmt':
-			/**
-			 * @todo Implement
-			 */
+			yield { kind: 'cast', type: { kind: 'plain', text: node.type.qualType }, value: _parseFirst(node) };
 			return;
 		case 'DefaultStmt':
 			yield { kind: 'default' };
@@ -501,11 +506,35 @@ export function* parse(node: Node): IterableIterator<xir.Unit> {
 			return;
 		}
 		case 'EnumConstantDecl':
+		case 'VarDecl':
+		case 'PredefinedExpr':
+			yield {
+				kind: 'declaration',
+				name: node.name!,
+				type: parseXIRType(node.type.qualType),
+				initializer: node.inner?.length ? _parseFirst<xir.Value>(node) : undefined,
+			};
+			return;
 		case 'EnumDecl':
+		case 'RecordDecl':
+			if (node.kind == 'RecordDecl' && !node.completeDefinition) {
+				// _note('Skipping incomplete definition')
+				return;
+			}
+			yield {
+				kind: node.kind == 'EnumDecl' ? 'enum' : node.tagUsed!,
+				name: node.name,
+				fields: node.inner!.flatMap(node => [...parse(node)] as xir.Declaration[]),
+			};
+			return;
 		case 'FieldDecl':
-			/**
-			 * @todo Implement
-			 */
+		case 'IndirectFieldDecl':
+		case 'ParmVarDecl':
+			yield {
+				kind: node.kind == 'ParmVarDecl' ? 'parameter' : 'field',
+				name: node.name,
+				type: parseXIRType(node.type.qualType),
+			};
 			return;
 		case 'CharacterLiteral':
 		case 'FloatingLiteral':
@@ -524,11 +553,25 @@ export function* parse(node: Node): IterableIterator<xir.Unit> {
 			};
 			return;
 		}
-		case 'FunctionDecl':
-			/**
-			 * @todo Implement
-			 */
+		case 'FunctionDecl': {
+			const [return_t] = node.type.qualType.replace(')', '').split('(');
+			const body = node.inner!.find(param => param.kind == 'CompoundStmt');
+
+			yield {
+				kind: 'function',
+				name: node.name,
+				returns: parseXIRType(return_t),
+				parameters: node
+					.inner!.filter(param => param.kind == 'ParmVarDecl')
+					.map((param, i) => ({
+						kind: 'parameter',
+						name: param.name ?? '__' + i,
+						type: parseXIRType(param.type.qualType),
+					})),
+				body: body ? [...parse(body)] : [],
+			};
 			return;
+		}
 		case 'GotoStmt':
 			yield { kind: 'goto', target: '_' + node.targetLabelDeclId };
 			return;
@@ -543,9 +586,9 @@ export function* parse(node: Node): IterableIterator<xir.Unit> {
 			return;
 		}
 		case 'ImplicitValueInitExpr':
-		case 'IndirectFieldDecl':
 			/**
-			 * @todo Implement
+			 * Does nothing in TS.
+			 * @todo Implement for other languages
 			 */
 			return;
 		case 'LabelStmt':
@@ -565,29 +608,37 @@ export function* parse(node: Node): IterableIterator<xir.Unit> {
 		case 'NullStmt':
 			// WTF is a null statement?
 			return;
-		case 'ParenExpr':
-		case 'ParmVarDecl':
-		case 'PredefinedExpr':
-			/**
-			 * @todo Implement
-			 */
-			return;
 		case 'PureAttr':
 			yield { kind: 'comment', text: node.kind.slice(0, -4) };
-			return;
-		case 'RecordDecl':
-			/**
-			 * @todo Implement
-			 */
 			return;
 		case 'ReturnStmt':
 			yield { kind: 'return', value: [...parse(node.inner[0])] as xir.Expression[] };
 			return;
-		case 'StaticAssertDecl':
-			/**
-			 * @todo Implement
-			 */
+		case 'StaticAssertDecl': {
+			const [assertion, message] = node.inner!;
+			yield {
+				kind: 'postfixed',
+				primary: [
+					{
+						kind: 'value',
+						type: {
+							kind: 'function',
+							returns: { kind: 'plain', text: 'void' },
+							args: [
+								{ kind: 'plain', text: 'bool' },
+								{ kind: 'plain', text: 'string' },
+							],
+						},
+						content: '$__assert',
+					},
+				],
+				post: {
+					type: 'call',
+					args: [[...parse(assertion)][0] as xir.Expression, [...parse(message)][0] as xir.Expression],
+				},
+			};
 			return;
+		}
 		case 'SwitchStmt': {
 			const [_expr, _body] = node.inner;
 			yield {
@@ -600,18 +651,31 @@ export function* parse(node: Node): IterableIterator<xir.Unit> {
 		case 'TypedefDecl':
 			yield { kind: 'type_alias', name: node.name, value: parseTypedef(node) };
 			return;
-		case 'UnaryExprOrTypeTraitExpr':
-			/**
-			 * @todo Implement
-			 */
+		case 'UnaryExprOrTypeTraitExpr': {
+			// In C this is always `sizeof x`
+			yield {
+				kind: 'postfixed',
+				primary: [
+					{
+						kind: 'value',
+						type: {
+							kind: 'function',
+							returns: { kind: 'plain', text: 'uint64' },
+							args: [{ kind: 'plain', text: 'any' }],
+						},
+						content: node.name!,
+					},
+				],
+				post: { type: 'call', args: [...parse(node.inner![0])] as xir.Expression[] },
+			};
 			return;
+		}
 		case 'UnaryOperator':
-			/**
-			 * @todo Implement
-			 */
-			return;
-		case 'VarDecl':
-			yield { kind: 'value', content: node.name, type: { kind: 'plain', text: node.type.qualType } };
+			yield {
+				kind: 'unary',
+				operator: node.opcode,
+				expression: [...parse(node.inner[0])] as xir.Expression[],
+			};
 			return;
 		case 'WarnUnusedResultAttr':
 			// _warn('Unused result');
