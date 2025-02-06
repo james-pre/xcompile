@@ -176,7 +176,7 @@ function parseXIRBaseType(type: string): string {
 
 const _type_anonymous = /(?:unnamed(?: \w+)?|anonymous) at /i;
 const _type_namespace = /^(struct|union|enum) (.*)/;
-const _type_function = /([^(\s]+)\s+\(\)\s*\((.*)\)/i;
+const _type_function = /([^(]+)\s+\(\)\s*\((.*)\)/i;
 
 function parseXIRType(type: string | Node, raw?: string, alt?: string, _isRaw: boolean = false): xir.Type {
 	if (!type) return { kind: 'plain', text: 'unknown' };
@@ -194,10 +194,6 @@ function parseXIRType(type: string | Node, raw?: string, alt?: string, _isRaw: b
 
 	if (match) type = alt ?? '';
 
-	const [, namespace, inner] = type.match(_type_namespace) ?? [];
-
-	if (namespace) return { kind: 'namespaced', namespace, inner: parseXIRType(inner) };
-
 	const [, fn_returns, fn_args] = type.match(_type_function) ?? [];
 
 	if (fn_returns)
@@ -206,6 +202,10 @@ function parseXIRType(type: string | Node, raw?: string, alt?: string, _isRaw: b
 			returns: parseXIRType(fn_returns),
 			args: fn_args.split(',').map(v => parseXIRType(v.trim())),
 		};
+
+	const [, namespace, inner] = type.match(_type_namespace) ?? [];
+
+	if (namespace) return { kind: 'namespaced', namespace, inner: parseXIRType(inner) };
 
 	type = type.trim();
 	if (type.startsWith('const ')) {
