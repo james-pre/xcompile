@@ -199,3 +199,105 @@ export type Unit =
 	| { kind: 'switch'; expression: Expression[]; body: Unit[] }
 	| { kind: 'type_alias'; name: string; value: Type }
 	| ({ kind: 'while'; isDo: boolean } & Conditional);
+
+function typeText(type: Type): string {
+	switch (type.kind) {
+		case 'plain':
+			return type.text;
+		case 'const_array':
+			return `${typeText(type.element)}[${type.length}]`;
+		case 'ref':
+			return `ref${type.restricted ? '(restricted)' : ''}<${typeText(type.to)}>`;
+		case 'function':
+			return `<(${type.args.map(typeText).join(', ')}) => ${typeText(type.returns)}>`;
+		case 'qual':
+			return `${type.qualifiers} ${typeText(type.inner)}`;
+		case 'namespaced':
+			return `${type.namespace}:${typeText(type.inner)}`;
+	}
+}
+
+function blockText(block: Unit[], noSemi: boolean = false): string {
+	return `{\n${block.map(text).join((noSemi ? '' : ';') + '\n')}\n}`;
+}
+
+function listText(expr: Unit[], noParans: boolean = false): string {
+	return (noParans ? '' : '(') + expr.map(text).join(', ') + (noParans ? '' : ')');
+}
+
+export function text(u: Unit): string {
+	switch (u.kind) {
+		case 'function':
+			return `${u.storage ?? ''} function ${u.name} ${listText(u.parameters)}: ${typeText(u.returns)} ${blockText(u.body)}`;
+		case 'return':
+			return 'return ' + listText(u.value);
+		case 'if':
+			return `if ${listText(u.condition)}\n${blockText(u.body)} ${!u.else ? '' : '\nelse ' + (u.else[0].kind == 'if' ? blockText(u.else) : blockText(u.else))}`;
+		case 'while':
+			return u.isDo
+				? `do ${blockText(u.body)} while ${listText(u.condition)}`
+				: `while ${listText(u.condition)} ${blockText(u.body)}`;
+		case 'for':
+			return `for (${listText(u.init, true)}; ${listText(u.condition, true)}; ${listText(u.action, true)}) ${blockText(u.body)}`;
+		case 'switch':
+			return `switch ${listText(u.expression)} ${blockText(u.body)}`;
+		case 'default':
+			return 'default:';
+		case 'case':
+			return `case ${text(u.matches)}:`;
+		case 'break':
+		case 'continue':
+		case 'goto':
+			return u.kind + ' ' + (u.target ?? '');
+		case 'label':
+			return `label ${u.name}: `;
+		case 'unary':
+			return `${u.operator} ${listText(u.expression)}`;
+		case 'assignment':
+		case 'binary':
+			return `${listText(u.left)} ${u.operator} ${listText(u.right)} `;
+		case 'ternary':
+			return `${listText(u.condition)} ? ${listText(u.true)} : ${listText(u.false)}`;
+		case 'postfixed': {
+			const primary = listText(u.primary);
+			switch (u.post.type) {
+				case 'increment':
+					return primary + '++';
+				case 'decrement':
+					return primary + '--';
+				case 'access':
+					return primary + '.' + u.post.key;
+				case 'access_ref':
+					return primary + '->' + u.post.key;
+				case 'bracket_access':
+					return primary + `[${listText(u.post.key)}]`;
+				case 'call':
+					return primary + listText(u.post.args);
+				default:
+					return `${(u.post as any).type}<${primary}>`;
+			}
+		}
+		case 'cast':
+			return `(cast ${text(u.value)} to ${typeText(u.type)})`;
+		case 'struct':
+		case 'class':
+		case 'union':
+			return `\n@${u.name}\n ${u.subRecords.map(text).join('\n')} ${u.kind} ${u.name} ${blockText(u.fields)}\n`;
+		case 'enum':
+			return `\nenum ${u.name} ${blockText(u.fields, true)}`;
+		case 'type_alias':
+			return `\ntype ${u.name} := ${typeText(u.value)};`;
+		case 'declaration':
+			return `\n${u.storage} ${typeHasQualifier(u.type, 'const') ? 'const' : 'let'} ${u.name}${u.type ? ': ' + typeText(u.type) : ''} ${u.initializer === undefined ? '' : ' = ' + text(u.initializer)};`;
+		case 'enum_field':
+			return `${u.name} = ${u.value ? text(u.value) : '<undefined>'},`;
+		case 'field':
+		case 'parameter':
+			return `${u.type ? typeText(u.type) : '<untyped>'} ${u.name ?? u.index} ${!u.initializer ? '' : ' = ' + text(u.initializer)}`;
+		case 'value':
+			// eslint-disable-next-line @typescript-eslint/no-base-to-string
+			return `${typeof u.content == 'string' ? u.content : u.content.map ? u.content.map(({ field, value }) => field + ': ' + text(value)).join(';\n') : u.content.toString()}`;
+		case 'comment':
+			return `/* ${u.text} */`;
+	}
+}

@@ -109,34 +109,6 @@ export interface FunctionProtoType extends GenericNode {
 
 export type Type = MiscType | QualType | DeclType | ElaboratedType | ConstantArrayType | FunctionProtoType;
 
-function parseType(node: Node): xir.Type {
-	switch (node.kind) {
-		case 'BuiltinType':
-		case 'EnumType':
-		case 'RecordType':
-		case 'TypedefType':
-			return parseXIRType(node, undefined, node.id);
-		case 'ParenType':
-			return parseType(node.inner![0]);
-		case 'QualType':
-			return { kind: 'qual', qualifiers: node.qualifiers, inner: parseType(node.inner![0]) };
-		case 'ElaboratedType':
-			return parseType(node.inner![0]);
-		case 'PointerType':
-			return { kind: 'ref', to: parseType(node.inner![0]) };
-		case 'ConstantArrayType':
-			return { kind: 'const_array', length: node.size, element: parseType(node.inner![0]) };
-		case 'FunctionProtoType':
-			return {
-				kind: 'function',
-				returns: node.inner ? parseType(node.inner[0]) : { kind: 'plain', text: 'unknown' },
-				args: node.inner?.slice(1).map(parseType) ?? [],
-			};
-		default:
-			throw 'Unsupported node kind: ' + node.kind;
-	}
-}
-
 const _typeMappings = {
 	char: 'int8',
 	'signed char': 'int8',
@@ -738,7 +710,8 @@ export function* parse(node: Node): IterableIterator<xir.Unit> {
 			return;
 		}
 		case 'TypedefDecl':
-			yield { kind: 'type_alias', name: node.name, value: parseTypedef(node) };
+			if (!['__builtin_ms_va_list', '__builtin_va_list', '__NSConstantString'].includes(node.name))
+				yield { kind: 'type_alias', name: node.name, value: parseTypedef(node) };
 			return;
 		case 'UnaryExprOrTypeTraitExpr': {
 			// In C this is always `sizeof x`

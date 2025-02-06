@@ -7,14 +7,12 @@
 	"types": "dist/index.d.ts",
 	"keywords": [],
 	"bin": {
-		"xcompile-bnf": "scripts/bnf.js",
-		"xcompile-dump": "scripts/dump.js",
-		"xcompile-c": "scripts/c.js",
-		"xcompile-c-pp": "scripts/c-pp.js"
+		"xcompile": "./cli.js"
 	},
 	"files": [
 		"dist",
-		"license.md"
+		"license.md",
+		"cli.js"
 	],
 	"type": "module",
 	"homepage": "https://github.com/james-pre/xcompile",

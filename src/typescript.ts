@@ -64,7 +64,7 @@ function emitDecorator(type: xir.Type | null, length?: number): string {
 	}
 }
 
-export const header = `
+export const cHeader = `
 import { Tuple, types as t, struct, member } from 'utilium';
 
 type int8 = number;
@@ -134,7 +134,7 @@ export function emit(u: xir.Unit): string {
 				case 'bracket_access':
 					return primary + `[${emitList(u.post.key)}]`;
 				case 'call':
-					return primary + `${emitList(u.post.args)}`;
+					return primary + emitList(u.post.args);
 				default:
 					throw 'Unknown postfix: ' + (u.post as any).type;
 			}
@@ -167,12 +167,4 @@ export function emit(u: xir.Unit): string {
 		case 'comment':
 			return `/* ${u.text} */`;
 	}
-}
-
-export function emitAll(units: xir.Unit[]): string {
-	let content = '';
-	for (const unit of units) {
-		content += emit(unit);
-	}
-	return content;
 }
