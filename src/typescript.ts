@@ -1,25 +1,7 @@
 import * as xir from './xir.js';
 
 function _baseType(typename: string): string {
-	if (!xir.isBuiltin(typename)) return typename.replaceAll(' ', '_');
-
-	switch (typename) {
-		case 'int8':
-		case 'uint8':
-		case 'int16':
-		case 'uint16':
-		case 'int32':
-		case 'uint32':
-		case 'int64':
-		case 'uint64':
-		case 'float32':
-		case 'float64':
-			return 'number';
-		case 'void':
-			return 'void';
-		case 'bool':
-			return 'boolean';
-	}
+	return typename.replaceAll(' ', '_');
 }
 
 function emitType(type: xir.Type): string {
@@ -29,9 +11,9 @@ function emitType(type: xir.Type): string {
 		case 'const_array':
 			return `Tuple<${emitType(type.element)}, ${type.length}>`;
 		case 'ref':
-			return `Ref<${emitType(type.to)}>`;
+			return `${type.restricted ? '/* restricted */' : ''} Ref<${emitType(type.to)}>`;
 		case 'function':
-			return `((${type.args.map(emitType).join(', ')}) => ${emitType(type.returns)})`;
+			return `((${type.args.map((param, i) => `_${i}: ${emitType(param)}`).join(', ')}) => ${emitType(type.returns)})`;
 		case 'qual':
 			return type.qualifiers == 'const'
 				? `Readonly<${emitType(type.inner)}>`
@@ -39,39 +21,65 @@ function emitType(type: xir.Type): string {
 	}
 }
 
-function emitBlock(block: xir.Unit[]): string {
-	return `{\n${block.map(emit).join(';\n')}\n}`;
+function emitBlock(block: xir.Unit[], noSemi: boolean = false): string {
+	return `{\n${block.map(emit).join((noSemi ? '' : ';') + '\n')}\n}`;
 }
 
-function emitList(expr: xir.Unit[]): string {
-	return `(${expr.map(emit).join(', ')})`;
+function emitList(expr: xir.Unit[], noParans: boolean = false): string {
+	return (noParans ? '' : '(') + expr.map(emit).join(', ') + (noParans ? '' : ')');
 }
 
 function _baseDecorator(typename: string): string {
-	return xir.isBuiltin(typename) ? (xir.isNumeric(typename) ? '@t.' + typename : '@t.uint8') : `@member(${typename})`;
+	return xir.isBuiltin(typename)
+		? xir.isNumeric(typename)
+			? '@t.' + typename
+			: '@t.uint8'
+		: `@member(${typename.replaceAll(' ', '_')})`;
 }
 
 /** Utilium type decorator for class member */
-function emitDecorator(type: xir.Type): string {
+function emitDecorator(type: xir.Type, length?: number): string {
+	if (!type) return '/* [!] missing type */';
 	switch (type.kind) {
 		case 'plain':
-			return _baseDecorator(type.text);
+			return xir.isBuiltin(type.text)
+				? (xir.isNumeric(type.text) ? '@t.' + type.text : '@t.uint8') +
+						(length !== undefined ? `(${length})` : '')
+				: `@member(${type.text.replaceAll(' ', '_')}${length !== undefined ? ', ' + length : ''})`;
 		case 'const_array':
-			if (type.element.kind != 'plain') throw 'Nested arrays in structs not supported.';
-			return _baseDecorator(type.element.text);
+			if (type.element.kind == 'const_array') return '/* nested array */';
+			return emitDecorator(type.element, type.length);
 		case 'ref':
-			return '/* ref */ ' + emitDecorator(type.to);
+			return emitDecorator(type.to);
 		case 'qual':
 			return emitDecorator(type.inner);
 		case 'function':
-			throw 'Functions can not be struct members';
+			return '';
 	}
 }
+
+export const header = `
+import { Tuple, types as t, struct, member } from 'utilium';
+
+type int8 = number;
+type uint8 = number;
+type int16 = number;
+type uint16 = number;
+type int32 = number;
+type uint32 = number;
+type int64 = bigint;
+type uint64 = bigint;
+type float32 = number;
+type float64 = number;
+type float128 = number;
+
+type Ref<T> = T;
+`;
 
 export function emit(u: xir.Unit): string {
 	switch (u.kind) {
 		case 'function':
-			return `function ${u.name} ${emitList(u.parameters)}: ${emitType(u.returns)}\n${emitBlock(u.body)}`;
+			return `${u.storage == 'extern' ? 'declare' : ''} function ${u.name} ${emitList(u.parameters)}: ${emitType(u.returns)}\n${u.storage == 'extern' ? '' : emitBlock(u.body)}`;
 		case 'return':
 			return 'return ' + emitList(u.value);
 		case 'if':
@@ -81,22 +89,26 @@ export function emit(u: xir.Unit): string {
 				? `do ${emitBlock(u.body)} while ${emitList(u.condition)}`
 				: `while ${emitList(u.condition)} ${emitBlock(u.body)}`;
 		case 'for':
-			return `for (${emitList(u.init)}; ${emitList(u.condition)}; ${emitList(u.action)}) ${emitBlock(u.body)}`;
+			return `for (${emitList(u.init, true)}; ${emitList(u.condition, true)}; ${emitList(u.action, true)}) ${emitBlock(u.body)}`;
 		case 'switch':
 			return `switch ${emitList(u.expression)} ${emitBlock(u.body)}`;
 		case 'default':
-			return 'default';
+			return 'default:';
 		case 'case':
 			return `case ${emit(u.matches)}:`;
 		case 'break':
 		case 'continue':
+			return u.kind + ' ' + (u.target ?? '');
 		case 'goto':
-			return u.target ? u.kind + ' ' + u.target : u.kind;
+			return `/* goto */ break ${u.target ?? ''}`;
 		case 'label':
 			return u.name + ':';
 		case 'unary':
-			if (u.operator == '*') return `$__deref(${emitList(u.expression)})`;
-			if (u.operator == '&') return `$__ref(${emitList(u.expression)})`;
+			if (u.operator == '*') return `$__deref${emitList(u.expression)}`;
+			if (u.operator == '&') return `$__ref${emitList(u.expression)}`;
+			if (u.operator == ('__extension__' as any))
+				return `/* __extension__ */ (() => { ${u.expression.slice(0, -1).map(emit).join(';')}; return ${emit(u.expression.at(-1)!)} })()`;
+			//	return `/* __extension__ */ (() => { $stmt = ${emitList(u.expression, true)}})()`;
 			return `${u.operator} ${emitList(u.expression)}`;
 		case 'assignment':
 		case 'binary':
@@ -117,7 +129,7 @@ export function emit(u: xir.Unit): string {
 				case 'bracket_access':
 					return primary + `[${emitList(u.post.key)}]`;
 				case 'call':
-					return primary + `(${emitList(u.post.args)})`;
+					return primary + `${emitList(u.post.args)}`;
 				default:
 					throw 'Unknown postfix: ' + (u.post as any).type;
 			}
@@ -126,18 +138,21 @@ export function emit(u: xir.Unit): string {
 			return `(${emit(u.value)} as ${emitType(u.type)})`;
 		case 'struct':
 		case 'class':
-			return `@struct() \n class struct_${u.name} {${u.fields.map(field => emitDecorator(field.type) + ' ' + emit(field)).join(';\n')}}`;
+			return `@struct() \n class struct_${u.name} {${u.fields.map(field => emitDecorator(field.type) + ' ' + emit(field)).join(';\n')}}\n`;
 		case 'enum':
-			return `enum ${u.name} ${emitBlock(u.fields)}`;
+			return `enum ${u.name} ${emitBlock(u.fields, true)}`;
 		case 'type_alias':
 			return `type ${u.name} = ${emitType(u.value)};\n`;
 		case 'declaration':
-			return `${xir.typeHasQualifier(u.type, 'const') ? 'const' : 'let'} ${u.name}: ${emitType(u.type)} ${u.initializer === undefined ? '' : ' = ' + emit(u.initializer)};\n`;
+			return `\n${u.storage == 'extern' ? 'declare' : ''} ${xir.typeHasQualifier(u.type, 'const') ? 'const' : 'let'} ${u.name}: ${emitType(u.type)} ${u.initializer === undefined ? '' : ' = ' + emit(u.initializer)};`;
+		case 'enum_field':
+			return `${u.name} ${u.value === undefined ? '' : ' = ' + emit(u.value)},\n`;
 		case 'field':
 		case 'parameter':
 			return `${u.name}: ${emitType(u.type)} ${!u.initializer ? '' : ' = ' + emit(u.initializer)}`;
 		case 'value':
-			return `${typeof u.content == 'string' ? u.content : u.content.map(({ field, value }) => field + ': ' + emit(value)).join(';\n')}`;
+			// eslint-disable-next-line @typescript-eslint/no-base-to-string
+			return `${typeof u.content == 'string' ? u.content : u.content.map ? u.content.map(({ field, value }) => field + ': ' + emit(value)).join(';\n') : u.content.toString()}`;
 		case 'union':
 			return `/* UNSUPPORTED: union ${u.name} */`;
 		case 'comment':

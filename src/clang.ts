@@ -115,7 +115,7 @@ function parseType(node: Node): xir.Type {
 		case 'EnumType':
 		case 'RecordType':
 		case 'TypedefType':
-			return parseXIRType(node.type.qualType);
+			return parseXIRType(node);
 		case 'ParenType':
 			return parseType(node.inner![0]);
 		case 'QualType':
@@ -127,7 +127,11 @@ function parseType(node: Node): xir.Type {
 		case 'ConstantArrayType':
 			return { kind: 'const_array', length: node.size, element: parseType(node.inner![0]) };
 		case 'FunctionProtoType':
-			return { kind: 'function', returns: parseType(node.inner![0]), args: node.inner!.slice(1).map(parseType) };
+			return {
+				kind: 'function',
+				returns: node.inner ? parseType(node.inner[0]) : { kind: 'plain', text: 'unknown' },
+				args: node.inner?.slice(1).map(parseType) ?? [],
+			};
 		default:
 			throw 'Unsupported node kind: ' + node.kind;
 	}
@@ -135,19 +139,27 @@ function parseType(node: Node): xir.Type {
 
 const _typeMappings = {
 	char: 'int8',
+	'signed char': 'int8',
 	'unsigned char': 'uint8',
 	short: 'int16',
+	'signed short': 'int16',
 	'unsigned short': 'uint16',
 	int: 'int32',
+	signed: 'int32',
 	unsigned: 'uint32',
+	'signed int': 'int32',
 	'unsigned int': 'uint32',
 	long: 'int64',
+	'signed long': 'int64',
 	'unsigned long': 'uint64',
 	'long int': 'int64',
+	'signed long int': 'int64',
 	'unsigned long int': 'uint64',
 	'long long': 'int64',
+	'signed long long': 'int64',
 	'unsigned long long': 'uint64',
 	'long long int': 'int64',
+	'signed long long int': 'int64',
 	'unsigned long long int': 'uint64',
 	float: 'float32',
 	double: 'float64',
@@ -161,14 +173,41 @@ function parseXIRBaseType(type: string): string {
 	return type;
 }
 
-function parseXIRType(type: string): xir.Type {
+const _type_anonymous = /(unnamed \w+|anonymous) at /i;
+
+const _type_function = /([^(\s]+)\s+\(\)\s*\((.*)\)/i;
+
+function parseXIRType(type: string | Node, id?: string): xir.Type {
+	if (!type) return { kind: 'plain', text: 'unknown' };
+
+	if (typeof type != 'string') return parseXIRType(type.type?.qualType, type.id);
+
+	type = type.trim();
+
+	const [, name] = type.match(_type_anonymous) ?? [];
+
+	if (name) type = name.replaceAll(' ', '_') + (id ? '_' + id : '');
+
+	const [, fn_returns, fn_args] = type.match(_type_function) ?? [];
+
+	if (fn_returns)
+		return {
+			kind: 'function',
+			returns: parseXIRType(fn_returns),
+			args: fn_args.split(',').map(v => parseXIRType(v.trim())),
+		};
+
 	type = type.trim();
 	if (type.startsWith('const ')) {
 		return { kind: 'qual', qualifiers: 'const', inner: parseXIRType(type.slice(6)) };
 	}
 
 	if (type.includes('*')) {
-		return { kind: 'ref', to: parseXIRType(type.replace(/\s*\*\s*/, '')) };
+		return {
+			kind: 'ref',
+			restricted: type.includes('*restrict'),
+			to: parseXIRType(type.replace(/\s*\*(restrict)?\s*/, '')),
+		};
 	}
 
 	if (type.at(-1) != ']') return { kind: 'plain', text: parseXIRBaseType(type) };
@@ -421,11 +460,7 @@ export function* parse(node: Node): IterableIterator<xir.Unit> {
 		case 'BinaryOperator':
 		case 'CompoundAssignOperator': {
 			const [left, right] = node.inner;
-			if (node.opcode == ',') {
-				yield* parse(left);
-				yield* parse(right);
-				return;
-			}
+
 			if (node.opcode == '__extension__') {
 				// _warn('__extension__ is not supported');
 				return;
@@ -462,7 +497,7 @@ export function* parse(node: Node): IterableIterator<xir.Unit> {
 		}
 		case 'ConstantExpr':
 			if (node.value) {
-				yield { kind: 'value', type: parseXIRType(node.type.qualType), content: node.value };
+				yield { kind: 'value', type: parseXIRType(node), content: node.value };
 				return;
 			}
 		// fallthrough
@@ -489,10 +524,13 @@ export function* parse(node: Node): IterableIterator<xir.Unit> {
 			return;
 		}
 		case 'CStyleCastExpr':
-			yield { kind: 'cast', type: parseXIRType(node.type.qualType), value: _parseFirst(node) };
+			yield { kind: 'cast', type: parseXIRType(node), value: _parseFirst(node) };
 			return;
 		case 'DefaultStmt':
 			yield { kind: 'default' };
+			for (const child of node.inner) {
+				yield* parse(child);
+			}
 			return;
 		case 'DeprecatedAttr':
 			// _warn('Deprecated')
@@ -507,13 +545,19 @@ export function* parse(node: Node): IterableIterator<xir.Unit> {
 			};
 			return;
 		}
-		case 'EnumConstantDecl':
-		case 'VarDecl':
 		case 'PredefinedExpr':
 			yield {
+				kind: 'assignment',
+				operator: '=',
+				left: [{ kind: 'value', type: { kind: 'plain', text: 'any' }, content: node.name! }],
+				right: [...parse(node.inner![0])] as xir.Expression[],
+			};
+			return;
+		case 'VarDecl':
+			yield {
 				kind: 'declaration',
-				name: node.name!,
-				type: parseXIRType(node.type.qualType),
+				name: node.name,
+				type: parseXIRType(node),
 				initializer: node.inner?.length ? _parseFirst<xir.Value>(node) : undefined,
 			};
 			return;
@@ -525,8 +569,16 @@ export function* parse(node: Node): IterableIterator<xir.Unit> {
 			}
 			yield {
 				kind: node.kind == 'EnumDecl' ? 'enum' : node.tagUsed!,
-				name: node.name,
+				name: node.name ?? '_' + node.id,
 				fields: node.inner!.flatMap(node => [...parse(node)] as xir.Declaration[]),
+			};
+			return;
+		case 'EnumConstantDecl':
+			yield {
+				kind: 'enum_field',
+				name: node.name,
+				type: parseXIRType(node),
+				value: node.inner?.length ? _parseFirst<xir.Value>(node) : undefined,
 			};
 			return;
 		case 'FieldDecl':
@@ -535,14 +587,15 @@ export function* parse(node: Node): IterableIterator<xir.Unit> {
 			yield {
 				kind: node.kind == 'ParmVarDecl' ? 'parameter' : 'field',
 				name: node.name,
-				type: parseXIRType(node.type.qualType),
+				type: parseXIRType(node),
+				storage: node.storageClass,
 			};
 			return;
 		case 'CharacterLiteral':
 		case 'FloatingLiteral':
 		case 'IntegerLiteral':
 		case 'StringLiteral':
-			yield { kind: 'value', type: parseXIRType(node.type.qualType), content: node.value! };
+			yield { kind: 'value', type: parseXIRType(node), content: node.value! };
 			return;
 		case 'ForStmt': {
 			const [_init, , _cond, _action, ..._body] = node.inner;
@@ -557,20 +610,22 @@ export function* parse(node: Node): IterableIterator<xir.Unit> {
 		}
 		case 'FunctionDecl': {
 			const [return_t] = node.type.qualType.replace(')', '').split('(');
-			const body = node.inner!.find(param => param.kind == 'CompoundStmt');
+			const body = node.inner?.find(param => param.kind == 'CompoundStmt');
 
 			yield {
 				kind: 'function',
 				name: node.name,
 				returns: parseXIRType(return_t),
-				parameters: node
-					.inner!.filter(param => param.kind == 'ParmVarDecl')
-					.map((param, i) => ({
-						kind: 'parameter',
-						name: param.name ?? '__' + i,
-						type: parseXIRType(param.type.qualType),
-					})),
+				parameters:
+					node.inner
+						?.filter(param => param.kind == 'ParmVarDecl')
+						.map((param, i) => ({
+							kind: 'parameter',
+							name: param.name ?? '__' + i,
+							type: parseXIRType(param),
+						})) ?? [],
 				body: body ? [...parse(body)] : [],
+				storage: node.storageClass,
 			};
 			return;
 		}
@@ -601,7 +656,7 @@ export function* parse(node: Node): IterableIterator<xir.Unit> {
 			yield {
 				kind: 'value',
 				content: node.referencedDecl.name,
-				type: parseXIRType(node.referencedDecl.type.qualType),
+				type: parseXIRType(node.referencedDecl),
 			};
 			return;
 		case 'MemberExpr':
@@ -620,8 +675,7 @@ export function* parse(node: Node): IterableIterator<xir.Unit> {
 		case 'ReturnStmt':
 			yield { kind: 'return', value: [...parse(node.inner[0])] as xir.Expression[] };
 			return;
-		case 'StaticAssertDecl': {
-			const [assertion, message] = node.inner!;
+		case 'StaticAssertDecl':
 			yield {
 				kind: 'postfixed',
 				primary: [
@@ -640,17 +694,16 @@ export function* parse(node: Node): IterableIterator<xir.Unit> {
 				],
 				post: {
 					type: 'call',
-					args: [[...parse(assertion)][0] as xir.Expression, [...parse(message)][0] as xir.Expression],
+					args: node.inner?.flatMap(node => [...parse(node)]) as xir.Expression[],
 				},
 			};
 			return;
-		}
 		case 'SwitchStmt': {
-			const [_expr, _body] = node.inner;
+			const [_expr, ..._body] = node.inner;
 			yield {
 				kind: 'switch',
 				expression: [...parse(_expr)] as xir.Expression[],
-				body: [...parse(_body)],
+				body: _body.flatMap(child => [...parse(child)]),
 			};
 			return;
 		}
@@ -672,7 +725,7 @@ export function* parse(node: Node): IterableIterator<xir.Unit> {
 						content: node.name!,
 					},
 				],
-				post: { type: 'call', args: [...parse(node.inner![0])] as xir.Expression[] },
+				post: { type: 'call', args: node.inner?.flatMap(node => [...parse(node)]) as xir.Expression[] },
 			};
 			return;
 		}

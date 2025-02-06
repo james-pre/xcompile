@@ -30,7 +30,7 @@ export type TypeQualifier = string;
 export type Type =
 	| { kind: 'plain'; text: string }
 	| { kind: 'const_array'; length: number; element: Type }
-	| { kind: 'ref'; to: Type }
+	| { kind: 'ref'; to: Type; restricted?: boolean }
 	| { kind: 'function'; returns: Type; args: Type[] }
 	| { kind: 'qual'; qualifiers: TypeQualifier; inner: Type };
 
@@ -107,7 +107,8 @@ export interface Binary {
 		| '<<'
 		| '>>'
 		| '<'
-		| '>';
+		| '>'
+		| ',';
 	left: Expression[];
 	right: Expression[];
 }
@@ -133,11 +134,14 @@ export interface Conditional {
 	body: Unit[];
 }
 
+export type StorageClass = 'extern' | 'static';
+
 export interface Declaration {
 	kind: 'declaration' | 'field' | 'parameter';
 	name: string;
 	type: Type;
 	initializer?: Value;
+	storage?: StorageClass;
 }
 
 export interface Function {
@@ -146,6 +150,7 @@ export interface Function {
 	parameters: Declaration[];
 	body: Unit[];
 	name: string;
+	storage?: StorageClass;
 }
 
 export type Unit =
@@ -153,6 +158,7 @@ export type Unit =
 	| { kind: 'default' }
 	| { kind: 'comment'; text: string }
 	| Declaration
+	| { kind: 'enum_field'; name: string; value?: Value; type?: Type }
 	| Expression
 	| ({ kind: 'for'; init: Expression[]; action: Expression[] } & Conditional)
 	| Function
