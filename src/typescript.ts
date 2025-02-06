@@ -18,6 +18,8 @@ function emitType(type: xir.Type): string {
 			return type.qualifiers == 'const'
 				? `Readonly<${emitType(type.inner)}>`
 				: `__Qual<${emitType(type.inner)}, '${type.qualifiers}'>`;
+		case 'namespaced':
+			return emitType(type.inner);
 	}
 }
 
@@ -29,21 +31,32 @@ function emitList(expr: xir.Unit[], noParans: boolean = false): string {
 	return (noParans ? '' : '(') + expr.map(emit).join(', ') + (noParans ? '' : ')');
 }
 
+function emitParameters(params: xir.Declaration[]): string {
+	const emitted: string[] = [];
+	for (let i = 0; i < params.length; i++) {
+		const param = params[i];
+		if (param.type && xir.baseType(param.type) != 'struct __va_list_tag') emitted.push(emit(param));
+		else emitted[emitted.length - 1] = '...' + emitted.at(-1) + '[]';
+	}
+	return emitted.join(', ');
+}
+
 /** Utilium type decorator for class member */
-function emitDecorator(type: xir.Type, length?: number): string {
-	if (!type) return '/* [!] missing type */';
+function emitDecorator(type: xir.Type | null, length?: number): string {
+	if (!type) return '';
 	if (type.kind == 'plain' && type.raw) type = type.raw;
 	switch (type.kind) {
 		case 'plain':
 			return xir.isBuiltin(type.text)
 				? (xir.isNumeric(type.text) ? '@t.' + type.text : '@t.uint8') +
 						(length !== undefined ? `(${length})` : '')
-				: `@member(${type.text.replaceAll(' ', '_')}${length !== undefined ? ', ' + length : ''})`;
+				: `@member(${type.text}${length !== undefined ? ', ' + length : ''})`;
 		case 'const_array':
 			if (type.element.kind == 'const_array') return '/* nested array */';
 			return emitDecorator(type.element, type.length);
 		case 'ref':
 			return emitDecorator(type.to);
+		case 'namespaced':
 		case 'qual':
 			return emitDecorator(type.inner);
 		case 'function':
@@ -69,12 +82,10 @@ type float128 = number;
 type Ref<T> = T;
 `;
 
-const _outsideFields = ['struct', 'class', 'union'];
-
 export function emit(u: xir.Unit): string {
 	switch (u.kind) {
 		case 'function':
-			return `${u.storage == 'extern' ? 'declare' : ''} function ${u.name} ${emitList(u.parameters)}: ${emitType(u.returns)}\n${u.storage == 'extern' ? '' : emitBlock(u.body)}`;
+			return `${u.storage == 'extern' ? 'declare' : ''} function ${u.name} (${emitParameters(u.parameters)}): ${emitType(u.returns)}\n${u.storage == 'extern' ? '' : emitBlock(u.body)}`;
 		case 'return':
 			return 'return ' + emitList(u.value);
 		case 'if':
@@ -135,7 +146,7 @@ export function emit(u: xir.Unit): string {
 		case 'union': {
 			return `${u.subRecords.map(emit).join('\n')}@struct(${
 				u.kind == 'union' ? '{ isUnion: true }' : ''
-			}) \nclass ${u.kind}_${u.name} {${u.fields
+			}) \nclass ${u.name} {${u.fields
 				.map(field => emitDecorator(field.type) + ' ' + emit(field))
 				.join(';\n')}}\n`;
 		}
@@ -144,12 +155,12 @@ export function emit(u: xir.Unit): string {
 		case 'type_alias':
 			return `type ${u.name} = ${emitType(u.value)};\n`;
 		case 'declaration':
-			return `\n${u.storage == 'extern' ? 'declare' : ''} ${xir.typeHasQualifier(u.type, 'const') ? 'const' : 'let'} ${u.name}: ${emitType(u.type)} ${u.initializer === undefined ? '' : ' = ' + emit(u.initializer)};`;
+			return `\n${u.storage == 'extern' ? 'declare' : ''} ${xir.typeHasQualifier(u.type, 'const') ? 'const' : 'let'} ${u.name}${u.type ? ': ' + emitType(u.type) : ''} ${u.initializer === undefined ? '' : ' = ' + emit(u.initializer)};`;
 		case 'enum_field':
 			return `${u.name} ${u.value === undefined ? '' : ' = ' + emit(u.value)},\n`;
 		case 'field':
 		case 'parameter':
-			return `${u.name ?? 'undefined_' + u.index}: ${emitType(u.type)} ${!u.initializer ? '' : ' = ' + emit(u.initializer)}`;
+			return `${u.name ?? 'undefined_' + u.index}${u.type ? ': ' + emitType(u.type) : ''} ${!u.initializer ? '' : ' = ' + emit(u.initializer)}`;
 		case 'value':
 			// eslint-disable-next-line @typescript-eslint/no-base-to-string
 			return `${typeof u.content == 'string' ? u.content : u.content.map ? u.content.map(({ field, value }) => field + ': ' + emit(value)).join(';\n') : u.content.toString()}`;

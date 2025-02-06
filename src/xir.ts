@@ -25,21 +25,34 @@ export function isBuiltin(type: string): type is BuiltinType {
 	return isNumeric(type) || type == 'void' || type == 'bool';
 }
 
-export type TypeQualifier = string;
-
-export interface RawType {
-	text: string;
-	lengths?: number[];
+export function baseType(type: Type): string {
+	switch (type.kind) {
+		case 'plain':
+			return type.text;
+		case 'const_array':
+			return baseType(type.element);
+		case 'ref':
+			return baseType(type.to);
+		case 'function':
+			return `((${type.args.map((param, i) => `_${i}: ${baseType(param)}`).join(', ')}) => ${baseType(type.returns)})`;
+		case 'qual':
+		case 'namespaced':
+			return baseType(type.inner);
+	}
 }
+
+export type TypeQualifier = string;
 
 export type Type =
 	| { kind: 'plain'; text: string; raw?: Type }
 	| { kind: 'const_array'; length: number; element: Type }
 	| { kind: 'ref'; to: Type; restricted?: boolean }
 	| { kind: 'function'; returns: Type; args: Type[] }
-	| { kind: 'qual'; qualifiers: TypeQualifier; inner: Type };
+	| { kind: 'qual'; qualifiers: TypeQualifier; inner: Type }
+	| { kind: 'namespaced'; namespace: string; inner: Type };
 
-export function typeHasQualifier(type: Type, qual: TypeQualifier): boolean {
+export function typeHasQualifier(type: Type | null, qual: TypeQualifier): boolean {
+	if (!type) return false;
 	switch (type.kind) {
 		case 'function':
 			return typeHasQualifier(type.returns, qual);
@@ -49,6 +62,8 @@ export function typeHasQualifier(type: Type, qual: TypeQualifier): boolean {
 			return typeHasQualifier(type.element, qual);
 		case 'ref':
 			return typeHasQualifier(type.to, qual);
+		case 'namespaced':
+			return typeHasQualifier(type.inner, qual);
 		case 'qual':
 			return type.qualifiers == qual;
 	}
@@ -144,7 +159,7 @@ export type StorageClass = 'extern' | 'static';
 export interface Declaration {
 	kind: 'declaration' | 'field' | 'parameter';
 	name: string;
-	type: Type;
+	type: Type | null;
 	initializer?: Value;
 	storage?: StorageClass;
 	index?: number;

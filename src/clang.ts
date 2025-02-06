@@ -115,7 +115,7 @@ function parseType(node: Node): xir.Type {
 		case 'EnumType':
 		case 'RecordType':
 		case 'TypedefType':
-			return parseXIRType(node);
+			return parseXIRType(node, undefined, node.id);
 		case 'ParenType':
 			return parseType(node.inner![0]);
 		case 'QualType':
@@ -175,7 +175,7 @@ function parseXIRBaseType(type: string): string {
 }
 
 const _type_anonymous = /(?:unnamed(?: \w+)?|anonymous) at /i;
-
+const _type_namespace = /^(struct|union|enum) (.*)/;
 const _type_function = /([^(\s]+)\s+\(\)\s*\((.*)\)/i;
 
 function parseXIRType(type: string | Node, raw?: string, alt?: string, _isRaw: boolean = false): xir.Type {
@@ -183,7 +183,8 @@ function parseXIRType(type: string | Node, raw?: string, alt?: string, _isRaw: b
 
 	if (typeof type != 'string') {
 		const _ = type.type ?? {};
-		return parseXIRType(_.qualType, _.desugaredQualType, type.name ?? '_' + type.id);
+		const _raw = type.kind.endsWith('Type') ? type.name || '_' + type.id : _.qualType;
+		return parseXIRType(_.qualType, _.desugaredQualType ?? _raw, _raw);
 	}
 
 	type = type.trim();
@@ -192,6 +193,10 @@ function parseXIRType(type: string | Node, raw?: string, alt?: string, _isRaw: b
 	const match = type.match(_type_anonymous);
 
 	if (match) type = alt ?? '';
+
+	const [, namespace, inner] = type.match(_type_namespace) ?? [];
+
+	if (namespace) return { kind: 'namespaced', namespace, inner: parseXIRType(inner) };
 
 	const [, fn_returns, fn_args] = type.match(_type_function) ?? [];
 
@@ -230,9 +235,12 @@ function parseXIRType(type: string | Node, raw?: string, alt?: string, _isRaw: b
 	return current;
 }
 
-function parseTypedef(node: Declaration): xir.Type {
+function parseTypedef(node: Node): xir.Type {
+	if (node.kind == 'ElaboratedType' && node.ownedTagDecl && !node.ownedTagDecl.name) {
+		return { kind: 'plain', text: '_' + node.ownedTagDecl.id };
+	}
 	if (!node.inner) return parseXIRType(node);
-	return parseType(node.inner[0]);
+	return parseTypedef(node.inner[0]);
 }
 
 export type StorageClass = 'extern' | 'static';
