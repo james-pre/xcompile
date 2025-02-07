@@ -67,6 +67,17 @@ function emitDecorator(type: xir.Type | null, lenOrNs?: number | null): string {
 	}
 }
 
+function emitValue(value: xir.Value): string {
+	if (typeof value.content == 'object' && 'map' in value.content)
+		return value.content.map(({ field, value }) => field + ': ' + emit(value)).join(';\n');
+
+	if (typeof value.content != 'string') return (value.content as any).toString();
+
+	if (value.content.startsWith('"') && value.content.endsWith('"')) return `$__str(${value.content})`;
+
+	return value.content;
+}
+
 /**
  * Boilerplate to make stuff with C work
  *
@@ -132,21 +143,24 @@ type ConstArray<T, L extends number> = Array<T> & { length: L } & Ref<T>;
 declare function $__assert(condition: boolean, message?: Ref<int8>): void;
 declare function $__ref<T>(value: T): Ref<T>;
 declare function $__deref<T>(value: Ref<T>): T;
-declare function $__array<T>(start: Ref<T>, i: bigint): T | undefined;
+declare function $__array<T>(start: Ref<T>, i: bigint): T;
 declare function $__array<T>(start: Ref<T>, i: bigint, value?: T): void;
 declare function $__str(value: string): Ref<int8>;
 declare function $__allocConstArray<T, L extends number>(length: L, ...init: T[]): ConstArray<T, L>;
 
-declare let __func__: string | undefined;
+declare let __func__: Ref<int8> | undefined;
 `;
 
 export function emit(u: xir.Unit): string {
 	switch (u.kind) {
 		case 'function': {
 			const signature = `function ${u.name} (${emitParameters(u.parameters)}): ${emitType(u.returns)}`;
-			return u.storage == 'extern' || !u.body.length
-				? `declare ${signature};`
-				: signature + '\n' + emitBlock(u.body);
+			return (
+				(u.exported ? 'export ' : '') +
+				(u.storage == 'extern' || !u.body.length
+					? `declare ${signature};`
+					: signature + '\n' + emitBlock(u.body))
+			);
 		}
 		case 'return':
 			return 'return ' + emitList(u.value);
@@ -208,29 +222,30 @@ export function emit(u: xir.Unit): string {
 		case 'union': {
 			// If name conflicts, add this: ${u.kind == 'struct' || u.kind == 'union' ? '$' + u.kind : ''}
 
-			if (!u.complete) return `declare class ${u.name} {}`;
+			const _export = u.exported ? 'export ' : '';
+
+			if (!u.complete) return _export + `declare class ${u.name} {}`;
 
 			return `${u.subRecords.map(emit).join('\n')}@struct(${
 				u.kind == 'union' ? '{ isUnion: true }' : ''
-			}) \nclass ${u.name} {${u.fields
+			}) \n${_export}class ${u.name} {${u.fields
 				.map(field => emitDecorator(field.type) + ' ' + emit(field))
 				.join(';\n')}}\n`;
 		}
 		case 'enum':
-			return `enum ${u.name} ${emitBlock(u.fields, true)}`;
+			return `\n${u.exported ? 'export ' : ''}enum ${u.name} ${emitBlock(u.fields, true)}`;
 		case 'type_alias':
 			if (u.name == emitType(u.value)) return '';
 			return `type ${u.name} = ${emitType(u.value)};\n`;
 		case 'declaration':
-			return `\n${u.storage == 'extern' ? 'declare' : ''} ${xir.typeHasQualifier(u.type, 'const') ? 'const' : 'let'} ${u.name}${u.type ? ': ' + emitType(u.type) : ''} ${u.initializer === undefined ? '' : ' = ' + emit(u.initializer)};`;
+			return `\n${u.exported ? 'export ' : ''}${u.storage == 'extern' ? 'declare ' : ''}let ${u.name}${u.type ? ': ' + emitType(u.type) : ''} ${u.initializer === undefined ? '' : ' = ' + emit(u.initializer)};`;
 		case 'enum_field':
 			return `${u.name} ${u.value === undefined ? '' : ' = ' + emit(u.value)},`;
 		case 'field':
 		case 'parameter':
 			return `${u.name ?? 'undefined_' + u.index}${u.type ? ': ' + emitType(u.type) : ''} ${!u.initializer ? '' : ' = ' + emit(u.initializer)}`;
 		case 'value':
-			// eslint-disable-next-line @typescript-eslint/no-base-to-string
-			return `${typeof u.content == 'string' ? u.content : u.content.map ? u.content.map(({ field, value }) => field + ': ' + emit(value)).join(';\n') : u.content.toString()}`;
+			return emitValue(u);
 		case 'comment':
 			return `/* ${u.text} */`;
 	}

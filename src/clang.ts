@@ -544,7 +544,6 @@ export function* parse(node: Node): IterableIterator<xir.Unit> {
 			return;
 		case 'EnumDecl':
 		case 'RecordDecl': {
-			if (!node.isUsed) return;
 			const subRecords: xir.RecordLike[] = [];
 			let lastSubRecord: number | undefined;
 
@@ -570,7 +569,6 @@ export function* parse(node: Node): IterableIterator<xir.Unit> {
 			return;
 		}
 		case 'EnumConstantDecl':
-			if (!node.isUsed) return;
 			yield {
 				kind: 'enum_field',
 				name: node.name,
@@ -614,6 +612,7 @@ export function* parse(node: Node): IterableIterator<xir.Unit> {
 				kind: 'function',
 				name: node.name,
 				returns: parseType(return_t),
+				exported: node.name == 'main',
 				parameters:
 					node.inner
 						?.filter(param => param.kind == 'ParmVarDecl')
@@ -674,7 +673,6 @@ export function* parse(node: Node): IterableIterator<xir.Unit> {
 			yield { kind: 'return', value: [...parse(node.inner[0])] as xir.Expression[] };
 			return;
 		case 'StaticAssertDecl':
-			if (!node.isUsed) return;
 			yield {
 				kind: 'postfixed',
 				primary: [

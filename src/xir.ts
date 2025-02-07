@@ -147,6 +147,7 @@ export interface Declaration {
 	initializer?: Value;
 	storage?: StorageClass;
 	index?: number;
+	exported?: boolean;
 }
 
 export interface Function {
@@ -156,6 +157,7 @@ export interface Function {
 	body: Unit[];
 	name: string;
 	storage?: StorageClass;
+	exported?: boolean;
 }
 
 export interface RecordLike {
@@ -164,6 +166,7 @@ export interface RecordLike {
 	complete?: boolean;
 	fields: Declaration[];
 	subRecords: RecordLike[];
+	exported?: boolean;
 }
 
 export type Unit =
@@ -182,7 +185,7 @@ export type Unit =
 	| RecordLike
 	| { kind: 'return'; value: Expression[] }
 	| { kind: 'switch'; expression: Expression[]; body: Unit[] }
-	| { kind: 'type_alias'; name: string; value: Type }
+	| { kind: 'type_alias'; name: string; value: Type; exported?: boolean }
 	| ({ kind: 'while'; isDo: boolean } & Conditional);
 
 function typeText(type: Type): string {
