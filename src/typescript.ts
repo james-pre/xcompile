@@ -1,25 +1,28 @@
+import { isType as isPrimitive } from 'utilium/internal/primitives.js';
 import * as xir from './xir.js';
 
 function _baseType(typename: string): string {
 	return typename.replaceAll(' ', '_');
 }
 
-function emitType(type: xir.Type): string {
+function emitType(type: xir.Type, namespace?: string): string {
 	switch (type.kind) {
 		case 'plain':
 			return _baseType(type.text);
-		case 'const_array':
-			return `Tuple<${emitType(type.element)}, ${type.length}>`;
+		case 'array':
+			return type.length === null
+				? emitType(type.element, namespace) + '[]'
+				: `Tuple<${emitType(type.element, namespace)}, ${type.length}>`;
 		case 'ref':
-			return `${type.restricted ? '/* restricted */' : ''} Ref<${emitType(type.to)}>`;
+			return `${type.restricted ? '/* restricted */' : ''} Ref<${emitType(type.to, namespace)}>`;
 		case 'function':
 			return `((${type.args.map((param, i) => `_${i}: ${emitType(param)}`).join(', ')}) => ${emitType(type.returns)})`;
 		case 'qual':
-			return type.qualifiers == 'const'
-				? `Readonly<${emitType(type.inner)}>`
-				: `__Qual<${emitType(type.inner)}, '${type.qualifiers}'>`;
+			return type.qualifier == 'const'
+				? `Readonly<${emitType(type.inner, namespace)}>`
+				: `/* ${type.qualifier} */ ${emitType(type.inner, namespace)}`;
 		case 'namespaced':
-			return emitType(type.inner);
+			return emitType(type.inner, namespace);
 	}
 }
 
@@ -35,24 +38,24 @@ function emitParameters(params: xir.Declaration[]): string {
 	const emitted: string[] = [];
 	for (let i = 0; i < params.length; i++) {
 		const param = params[i];
-		if (param.type && xir.baseType(param.type) != 'struct __va_list_tag') emitted.push(emit(param));
+		if (param.type && xir.baseType(param.type) != '__va_list_tag') emitted.push(emit(param));
 		else emitted[emitted.length - 1] = '...' + emitted.at(-1) + '[]';
 	}
 	return emitted.join(', ');
 }
 
 /** Utilium type decorator for class member */
-function emitDecorator(type: xir.Type | null, length?: number): string {
+function emitDecorator(type: xir.Type | null, lenOrNs?: number | null): string {
 	if (!type) return '';
 	if (type.kind == 'plain' && type.raw) type = type.raw;
 	switch (type.kind) {
 		case 'plain':
 			return xir.isBuiltin(type.text)
-				? (xir.isNumeric(type.text) ? '@t.' + type.text : '@t.uint8') +
-						(length !== undefined ? `(${length})` : '')
-				: `@member(${type.text}${length !== undefined ? ', ' + length : ''})`;
-		case 'const_array':
-			if (type.element.kind == 'const_array') return '/* nested array */';
+				? (isPrimitive(type.text) ? '@t.' + type.text : '@t.uint8') +
+						(lenOrNs !== undefined ? `(${lenOrNs ?? ''})` : '')
+				: `@member(${type.text}${lenOrNs !== undefined ? ', ' + (lenOrNs ?? '') : ''})`;
+		case 'array':
+			if (type.element.kind == 'array') return '/* nested array */';
 			return emitDecorator(type.element, type.length);
 		case 'ref':
 			return emitDecorator(type.to);
@@ -65,7 +68,7 @@ function emitDecorator(type: xir.Type | null, length?: number): string {
 }
 
 export const cHeader = `
-import { Tuple, types as t, struct, member } from 'utilium';
+import { Tuple, types as t, struct, member, sizeof } from 'utilium';
 
 type int8 = number;
 type uint8 = number;
@@ -75,17 +78,30 @@ type int32 = number;
 type uint32 = number;
 type int64 = bigint;
 type uint64 = bigint;
+type int128 = bigint;
+type uint128 = bigint;
 type float32 = number;
 type float64 = number;
 type float128 = number;
 
-type Ref<T> = T;
+type bool = boolean | number;
+type Ref<T> = number;
+
+declare function $__assert(condition: boolean, message?: string): void;
+declare function $__ref<T>(value: T): Ref<T>;
+declare function $__deref<T>(value: Ref<T>): T;
+declare function $__array<T>(start: Ref<T>, i: bigint): T | undefined;
+declare function $__array<T>(start: Ref<T>, i: bigint, value?: T): void;
 `;
 
 export function emit(u: xir.Unit): string {
 	switch (u.kind) {
-		case 'function':
-			return `${u.storage == 'extern' ? 'declare' : ''} function ${u.name} (${emitParameters(u.parameters)}): ${emitType(u.returns)}\n${u.storage == 'extern' ? '' : emitBlock(u.body)}`;
+		case 'function': {
+			const signature = `function ${u.name} (${emitParameters(u.parameters)}): ${emitType(u.returns)}`;
+			return u.storage == 'extern' || !u.body.length
+				? `declare ${signature};`
+				: signature + '\n' + emitBlock(u.body);
+		}
 		case 'return':
 			return 'return ' + emitList(u.value);
 		case 'if':
@@ -144,6 +160,10 @@ export function emit(u: xir.Unit): string {
 		case 'struct':
 		case 'class':
 		case 'union': {
+			// If name conflicts, add this: ${u.kind == 'struct' || u.kind == 'union' ? '$' + u.kind : ''}
+
+			if (!u.complete) return `declare class ${u.name} {}`;
+
 			return `${u.subRecords.map(emit).join('\n')}@struct(${
 				u.kind == 'union' ? '{ isUnion: true }' : ''
 			}) \nclass ${u.name} {${u.fields
@@ -153,11 +173,12 @@ export function emit(u: xir.Unit): string {
 		case 'enum':
 			return `enum ${u.name} ${emitBlock(u.fields, true)}`;
 		case 'type_alias':
+			if (u.name == emitType(u.value)) return '';
 			return `type ${u.name} = ${emitType(u.value)};\n`;
 		case 'declaration':
 			return `\n${u.storage == 'extern' ? 'declare' : ''} ${xir.typeHasQualifier(u.type, 'const') ? 'const' : 'let'} ${u.name}${u.type ? ': ' + emitType(u.type) : ''} ${u.initializer === undefined ? '' : ' = ' + emit(u.initializer)};`;
 		case 'enum_field':
-			return `${u.name} ${u.value === undefined ? '' : ' = ' + emit(u.value)},\n`;
+			return `${u.name} ${u.value === undefined ? '' : ' = ' + emit(u.value)},`;
 		case 'field':
 		case 'parameter':
 			return `${u.name ?? 'undefined_' + u.index}${u.type ? ': ' + emitType(u.type) : ''} ${!u.initializer ? '' : ' = ' + emit(u.initializer)}`;

@@ -136,83 +136,75 @@ const _typeMappings = {
 	float: 'float32',
 	double: 'float64',
 	'long double': 'float128',
+	__int128: 'int128',
+	'unsigned __int128': 'uint128',
 };
 
-// Convert strings into XIR types
-function parseXIRBaseType(type: string): string {
+// Convert strings into XIR string types
+function parseBaseType(type: string): string {
 	type = type.trim();
 	if (xir.isBuiltin(type)) return type;
 	if (type in _typeMappings) return _typeMappings[type as keyof typeof _typeMappings];
 	return type;
 }
 
-const _type_anonymous = /(?:unnamed(?: \w+)?|anonymous) at /i;
+const _type_anonymous = /(?:unnamed(?: \w+)?|anonymous) at /;
 const _type_namespace = /^(struct|union|enum) (.*)/;
-const _type_function = /([^(]+)\s+\(\)\s*\((.*)\)/i;
+const _type_function = /^([^(]+)\s+\((.*)\)/;
+const _type_function_pointer = /([^(]+)\s+\(\*\)\s*\((.*)\)/;
+const _type_array = /(.*)\[(\d*)\]$/;
+const _type_pointer = /(.*)\s*\*(?:restrict)?$/;
+const _type_qualified = /^(const|volatile)(\W+.*)|(.*\W+)(const|volatile)$/;
 
-function parseXIRType(type: string | Node, raw?: string, alt?: string, _isRaw: boolean = false): xir.Type {
+function parseType(type: string | Node, raw?: string, alt?: string, _isRaw: boolean = false): xir.Type {
 	if (!type) return { kind: 'plain', text: 'unknown' };
 
 	if (typeof type != 'string') {
 		const _ = type.type ?? {};
-		const _raw = type.kind.endsWith('Type') ? type.name || '_' + type.id : _.qualType;
-		return parseXIRType(_.qualType, _.desugaredQualType ?? _raw, _raw);
+
+		if (type.kind == 'ElaboratedType' && type.ownedTagDecl && !type.ownedTagDecl.name) {
+			return { kind: 'plain', text: '_' + type.ownedTagDecl.id, raw: parseType(type.type.qualType) };
+		}
+
+		return parseType(_.qualType, _.desugaredQualType, _.qualType);
 	}
 
 	type = type.trim();
 	raw ??= type;
 
 	const match = type.match(_type_anonymous);
-
 	if (match) type = alt ?? '';
 
-	const [, fn_returns, fn_args] = type.match(_type_function) ?? [];
-
-	if (fn_returns)
-		return {
-			kind: 'function',
-			returns: parseXIRType(fn_returns),
-			args: fn_args.split(',').map(v => parseXIRType(v.trim())),
-		};
-
-	const [, namespace, inner] = type.match(_type_namespace) ?? [];
-
-	if (namespace) return { kind: 'namespaced', namespace, inner: parseXIRType(inner) };
-
 	type = type.trim();
-	if (type.startsWith('const ')) {
-		return { kind: 'qual', qualifiers: 'const', inner: parseXIRType(type.slice(6)) };
+
+	const [isPtr, to] = type.match(_type_pointer) ?? [];
+	if (isPtr) return { kind: 'ref', restricted: type.includes('*restrict'), to: parseType(to) };
+
+	const [isFnPtr, fn_ptr_returns, fn_ptr_args] = type.match(_type_function_pointer) ?? [];
+	if (isFnPtr) {
+		const args = fn_ptr_args.split(',').map(v => parseType(v.trim()));
+		return { kind: 'function', returns: parseType(fn_ptr_returns), args };
 	}
 
-	if (type.includes('*')) {
-		return {
-			kind: 'ref',
-			restricted: type.includes('*restrict'),
-			to: parseXIRType(type.replace(/\s*\*(restrict)?\s*/, '')),
-		};
+	const [isFn, fn_returns, fn_args] = type.match(_type_function) ?? [];
+	if (isFn) {
+		const args = fn_args.split(',').map(v => parseType(v.trim()));
+		return { kind: 'function', returns: parseType(fn_returns), args };
 	}
 
-	const _raw = _isRaw ? undefined : parseXIRType(raw, raw, alt, true);
+	const [isNs, namespace, inner] = type.match(_type_namespace) ?? [];
+	if (isNs) return { kind: 'namespaced', namespace, inner: parseType(inner.trim()) };
 
-	if (type.at(-1) != ']') return { kind: 'plain', text: parseXIRBaseType(type), raw: _raw };
-
-	const [base, ...lengths] = type.replaceAll(']', '').split('[');
-
-	let current: xir.Type = { kind: 'plain', text: parseXIRBaseType(base), raw: _raw };
-
-	for (const length of lengths.map(Number)) {
-		current = { kind: 'const_array', length, element: current };
+	const [isQualified, leftQualifier, leftInner, rightInner, rightQualifier] = type.match(_type_qualified) ?? [];
+	if (isQualified) {
+		const [qualifier, inner] = leftQualifier ? [leftQualifier, leftInner] : [rightQualifier, rightInner];
+		return { kind: 'qual', qualifier, inner: parseType(inner.trim()) };
 	}
 
-	return current;
-}
+	const [isArray, element, length] = type.match(_type_array) ?? [];
+	if (isArray) return { kind: 'array', length: length ? +length : null, element: parseType(element) };
 
-function parseTypedef(node: Node): xir.Type {
-	if (node.kind == 'ElaboratedType' && node.ownedTagDecl && !node.ownedTagDecl.name) {
-		return { kind: 'plain', text: '_' + node.ownedTagDecl.id };
-	}
-	if (!node.inner) return parseXIRType(node);
-	return parseTypedef(node.inner[0]);
+	return { kind: 'plain', text: parseBaseType(type), raw: _isRaw ? undefined : parseType(raw, raw, alt, true) };
 }
 
 export type StorageClass = 'extern' | 'static';
@@ -484,7 +476,7 @@ export function* parse(node: Node): IterableIterator<xir.Unit> {
 		}
 		case 'ConstantExpr':
 			if (node.value) {
-				yield { kind: 'value', type: parseXIRType(node), content: node.value };
+				yield { kind: 'value', type: parseType(node), content: node.value };
 				return;
 			}
 		// fallthrough
@@ -511,7 +503,7 @@ export function* parse(node: Node): IterableIterator<xir.Unit> {
 			return;
 		}
 		case 'CStyleCastExpr':
-			yield { kind: 'cast', type: parseXIRType(node), value: _parseFirst(node) };
+			yield { kind: 'cast', type: parseType(node), value: _parseFirst(node) };
 			return;
 		case 'DefaultStmt':
 			yield { kind: 'default' };
@@ -544,17 +536,13 @@ export function* parse(node: Node): IterableIterator<xir.Unit> {
 			yield {
 				kind: 'declaration',
 				name: node.name,
-				type: parseXIRType(node),
+				type: parseType(node),
+				storage: node.storageClass,
 				initializer: node.inner?.length ? _parseFirst<xir.Value>(node) : undefined,
 			};
 			return;
 		case 'EnumDecl':
 		case 'RecordDecl': {
-			if (node.kind == 'RecordDecl' && !node.completeDefinition) {
-				// _note('Skipping incomplete definition')
-				return;
-			}
-
 			const subRecords: xir.RecordLike[] = [];
 			let lastSubRecord: number | undefined;
 
@@ -562,8 +550,9 @@ export function* parse(node: Node): IterableIterator<xir.Unit> {
 				kind: node.kind == 'EnumDecl' ? 'enum' : node.tagUsed!,
 				name: node.name ?? '_' + node.id,
 				subRecords,
-				fields: node
-					.inner!.flatMap((node, i) => {
+				complete: node.completeDefinition,
+				fields: node.inner
+					?.flatMap((node, i) => {
 						if (node.kind != 'RecordDecl') {
 							if (i - 1 === lastSubRecord) {
 								node.type.qualType = subRecords.at(-1)?.name ?? node.type.qualType;
@@ -582,7 +571,7 @@ export function* parse(node: Node): IterableIterator<xir.Unit> {
 			yield {
 				kind: 'enum_field',
 				name: node.name,
-				type: parseXIRType(node),
+				type: parseType(node),
 				value: node.inner?.length ? _parseFirst<xir.Value>(node) : undefined,
 			};
 			return;
@@ -592,7 +581,7 @@ export function* parse(node: Node): IterableIterator<xir.Unit> {
 			yield {
 				kind: node.kind == 'ParmVarDecl' ? 'parameter' : 'field',
 				name: node.name,
-				type: parseXIRType(node),
+				type: parseType(node),
 				storage: node.storageClass,
 			};
 			return;
@@ -600,7 +589,7 @@ export function* parse(node: Node): IterableIterator<xir.Unit> {
 		case 'FloatingLiteral':
 		case 'IntegerLiteral':
 		case 'StringLiteral':
-			yield { kind: 'value', type: parseXIRType(node), content: node.value! };
+			yield { kind: 'value', type: parseType(node), content: node.value! };
 			return;
 		case 'ForStmt': {
 			const [_init, , _cond, _action, ..._body] = node.inner;
@@ -620,14 +609,14 @@ export function* parse(node: Node): IterableIterator<xir.Unit> {
 			yield {
 				kind: 'function',
 				name: node.name,
-				returns: parseXIRType(return_t),
+				returns: parseType(return_t),
 				parameters:
 					node.inner
 						?.filter(param => param.kind == 'ParmVarDecl')
 						.map((param, i) => ({
 							kind: 'parameter',
 							name: param.name ?? '__' + i,
-							type: parseXIRType(param),
+							type: parseType(param),
 						})) ?? [],
 				body: body ? [...parse(body)] : [],
 				storage: node.storageClass,
@@ -661,7 +650,7 @@ export function* parse(node: Node): IterableIterator<xir.Unit> {
 			yield {
 				kind: 'value',
 				content: node.referencedDecl.name,
-				type: parseXIRType(node.referencedDecl),
+				type: parseType(node.referencedDecl),
 			};
 			return;
 		case 'MemberExpr':
@@ -688,8 +677,8 @@ export function* parse(node: Node): IterableIterator<xir.Unit> {
 						kind: 'value',
 						type: {
 							kind: 'function',
-							returns: parseXIRType('void'),
-							args: [parseXIRType('bool'), parseXIRType('string')],
+							returns: parseType('void'),
+							args: [parseType('bool'), parseType('string')],
 						},
 						content: '$__assert',
 					},
@@ -710,8 +699,9 @@ export function* parse(node: Node): IterableIterator<xir.Unit> {
 			return;
 		}
 		case 'TypedefDecl':
-			if (!['__builtin_ms_va_list', '__builtin_va_list', '__NSConstantString'].includes(node.name))
-				yield { kind: 'type_alias', name: node.name, value: parseTypedef(node) };
+			if (!['__builtin_ms_va_list', '__builtin_va_list', '__NSConstantString'].includes(node.name)) {
+				yield { kind: 'type_alias', name: node.name, value: parseType(node.inner![0]) };
+			}
 			return;
 		case 'UnaryExprOrTypeTraitExpr': {
 			// In C this is always `sizeof x`
@@ -720,7 +710,7 @@ export function* parse(node: Node): IterableIterator<xir.Unit> {
 				primary: [
 					{
 						kind: 'value',
-						type: { kind: 'function', returns: parseXIRType('uint64'), args: [parseXIRType('any')] },
+						type: { kind: 'function', returns: parseType('uint64'), args: [parseType('any')] },
 						content: node.name!,
 					},
 				],

@@ -1,35 +1,19 @@
 /** A high-level intermediate representation */
 
-const _numerics = [
-	'int8',
-	'uint8',
-	'int16',
-	'uint16',
-	'int32',
-	'uint32',
-	'int64',
-	'uint64',
-	'float32',
-	'float64',
-] as const;
+import type { Type as BuiltinNumber } from 'utilium/internal/primitives.js';
+import { isType as isPrimitive } from 'utilium/internal/primitives.js';
 
-export type BuiltinNumeric = (typeof _numerics)[number];
-
-export type BuiltinType = BuiltinNumeric | 'void' | 'bool';
-
-export function isNumeric(builtin: string): builtin is BuiltinNumeric {
-	return _numerics.includes(builtin as any);
-}
+export type BuiltinType = BuiltinNumber | 'void' | 'bool';
 
 export function isBuiltin(type: string): type is BuiltinType {
-	return isNumeric(type) || type == 'void' || type == 'bool';
+	return isPrimitive(type) || type == 'void' || type == 'bool';
 }
 
 export function baseType(type: Type): string {
 	switch (type.kind) {
 		case 'plain':
 			return type.text;
-		case 'const_array':
+		case 'array':
 			return baseType(type.element);
 		case 'ref':
 			return baseType(type.to);
@@ -45,10 +29,10 @@ export type TypeQualifier = string;
 
 export type Type =
 	| { kind: 'plain'; text: string; raw?: Type }
-	| { kind: 'const_array'; length: number; element: Type }
+	| { kind: 'array'; length: number | null; element: Type }
 	| { kind: 'ref'; to: Type; restricted?: boolean }
 	| { kind: 'function'; returns: Type; args: Type[] }
-	| { kind: 'qual'; qualifiers: TypeQualifier; inner: Type }
+	| { kind: 'qual'; qualifier: TypeQualifier; inner: Type }
 	| { kind: 'namespaced'; namespace: string; inner: Type };
 
 export function typeHasQualifier(type: Type | null, qual: TypeQualifier): boolean {
@@ -58,14 +42,14 @@ export function typeHasQualifier(type: Type | null, qual: TypeQualifier): boolea
 			return typeHasQualifier(type.returns, qual);
 		case 'plain':
 			return false;
-		case 'const_array':
+		case 'array':
 			return typeHasQualifier(type.element, qual);
 		case 'ref':
 			return typeHasQualifier(type.to, qual);
 		case 'namespaced':
 			return typeHasQualifier(type.inner, qual);
 		case 'qual':
-			return type.qualifiers == qual;
+			return type.qualifier == qual;
 	}
 }
 
@@ -177,6 +161,7 @@ export interface Function {
 export interface RecordLike {
 	kind: 'struct' | 'class' | 'union' | 'enum';
 	name?: string;
+	complete?: boolean;
 	fields: Declaration[];
 	subRecords: RecordLike[];
 }
@@ -204,14 +189,14 @@ function typeText(type: Type): string {
 	switch (type.kind) {
 		case 'plain':
 			return type.text;
-		case 'const_array':
+		case 'array':
 			return `${typeText(type.element)}[${type.length}]`;
 		case 'ref':
 			return `ref${type.restricted ? '(restricted)' : ''}<${typeText(type.to)}>`;
 		case 'function':
 			return `<(${type.args.map(typeText).join(', ')}) => ${typeText(type.returns)}>`;
 		case 'qual':
-			return `${type.qualifiers} ${typeText(type.inner)}`;
+			return `${type.qualifier} ${typeText(type.inner)}`;
 		case 'namespaced':
 			return `${type.namespace}:${typeText(type.inner)}`;
 	}
