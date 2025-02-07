@@ -533,6 +533,7 @@ export function* parse(node: Node): IterableIterator<xir.Unit> {
 			};
 			return;
 		case 'VarDecl':
+			if (!node.isUsed) return;
 			yield {
 				kind: 'declaration',
 				name: node.name,
@@ -543,6 +544,7 @@ export function* parse(node: Node): IterableIterator<xir.Unit> {
 			return;
 		case 'EnumDecl':
 		case 'RecordDecl': {
+			if (!node.isUsed) return;
 			const subRecords: xir.RecordLike[] = [];
 			let lastSubRecord: number | undefined;
 
@@ -568,6 +570,7 @@ export function* parse(node: Node): IterableIterator<xir.Unit> {
 			return;
 		}
 		case 'EnumConstantDecl':
+			if (!node.isUsed) return;
 			yield {
 				kind: 'enum_field',
 				name: node.name,
@@ -603,6 +606,7 @@ export function* parse(node: Node): IterableIterator<xir.Unit> {
 			return;
 		}
 		case 'FunctionDecl': {
+			if (!node.isUsed && node.name != 'main') return;
 			const [return_t] = node.type.qualType.replace(')', '').split('(');
 			const body = node.inner?.find(param => param.kind == 'CompoundStmt');
 
@@ -670,6 +674,7 @@ export function* parse(node: Node): IterableIterator<xir.Unit> {
 			yield { kind: 'return', value: [...parse(node.inner[0])] as xir.Expression[] };
 			return;
 		case 'StaticAssertDecl':
+			if (!node.isUsed) return;
 			yield {
 				kind: 'postfixed',
 				primary: [
@@ -699,6 +704,7 @@ export function* parse(node: Node): IterableIterator<xir.Unit> {
 			return;
 		}
 		case 'TypedefDecl':
+			if (!node.isReferenced) return;
 			if (!['__builtin_ms_va_list', '__builtin_va_list', '__NSConstantString'].includes(node.name)) {
 				yield { kind: 'type_alias', name: node.name, value: parseType(node.inner![0]) };
 			}
