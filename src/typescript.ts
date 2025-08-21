@@ -1,5 +1,5 @@
-import { isType as isPrimitive } from 'utilium/internal/primitives.js';
 import * as xir from './xir.js';
+import { isTypeName } from 'memium/primitives';
 
 function _baseType(typename: string): string {
 	return typename.replaceAll(' ', '_');
@@ -44,26 +44,25 @@ function emitParameters(params: xir.Declaration[]): string {
 	return emitted.join(', ');
 }
 
-/** Utilium type decorator for class member */
-function emitDecorator(type: xir.Type | null, lenOrNs?: number | null): string {
-	if (!type) return '';
+/** Emit runtime Memium field type */
+function emitFieldType(type: xir.Type | null): string {
+	if (!type) return 'Void /* no type */';
 	if (type.kind == 'plain' && type.raw) type = type.raw;
 	switch (type.kind) {
 		case 'plain':
-			return xir.isBuiltin(type.text)
-				? (isPrimitive(type.text) ? '@t.' + type.text : '@t.uint8') +
-						(lenOrNs !== undefined ? `(${lenOrNs ?? ''})` : '')
-				: `@member(${type.text}${lenOrNs !== undefined ? ', ' + (lenOrNs ?? '') : ''})`;
+			if (isTypeName(type.text)) return 't.' + type.text;
+			if (type.text == 'void') return 'Void';
+			if (type.text == 'bool') return 't.uint8';
+			return type.text;
 		case 'array':
-			if (type.element.kind == 'array') return '/* nested array */';
-			return emitDecorator(type.element, type.length);
+			return `array(${emitFieldType(type.element)}, ${type.length})`;
 		case 'ref':
-			return emitDecorator(type.to);
+			return `$ref_t(${emitFieldType(type.to)})`;
 		case 'namespaced':
 		case 'qual':
-			return emitDecorator(type.inner);
+			return emitFieldType(type.inner);
 		case 'function':
-			return '';
+			return 'Void /* function */';
 	}
 }
 
@@ -120,7 +119,8 @@ function emitValue(value: xir.Value): string {
  *
  */
 export const cHeader = `
-import { types as t, struct, member, sizeof } from 'utilium';
+import { types as t, struct, union, sizeof, Void, array } from 'memium';
+import type { StructConstructor, Type, FieldConfigInit } from 'memium';
 
 type int8 = number;
 type uint8 = number;
@@ -139,6 +139,8 @@ type float128 = number;
 type bool = boolean | number;
 type Ref<T> = bigint & { __ref__?: T };
 type ConstArray<T, L extends number> = Array<T> & { length: L } & Ref<T>;
+
+declare function $ref_t<T extends Type>(t: FieldConfigInit<T>): Type<Ref<T>>;
 
 declare function $__assert(condition: boolean, message?: Ref<int8>): void;
 declare function $__ref<T>(value: T): Ref<T>;
@@ -224,13 +226,9 @@ export function emit(u: xir.Unit): string {
 
 			const _export = u.exported ? 'export ' : '';
 
-			if (!u.complete) return _export + `declare class ${u.name} {}`;
+			if (!u.complete) return _export + `declare const ${u.name}: StructConstructor<unknown>;`;
 
-			return `${u.subRecords.map(emit).join('\n')}@struct(${
-				u.kind == 'union' ? '{ isUnion: true }' : ''
-			}) \n${_export}class ${u.name} {${u.fields
-				.map(field => emitDecorator(field.type) + ' ' + emit(field))
-				.join(';\n')}}\n`;
+			return `${_export} const ${u.name} = ${u.kind == 'struct' ? 'struct' : 'union'}("${u.name}", {\n${u.fields.map(f => `\t${f.name}: ${emitFieldType(f.type)}`).join(',\n')}\n});\n${_export}interface ${u.name} extends InstanceType<typeof ${u.name}> {};\n`;
 		}
 		case 'enum':
 			return `\n${u.exported ? 'export ' : ''}enum ${u.name} ${emitBlock(u.fields, true)}`;

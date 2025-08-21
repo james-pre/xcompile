@@ -1,9 +1,9 @@
 /** A high-level intermediate representation */
 
-import type { Type as BuiltinNumber } from 'utilium/internal/primitives.js';
-import { isType as isPrimitive } from 'utilium/internal/primitives.js';
+import type { TypeName } from 'memium/primitives';
+import { isTypeName as isPrimitive } from 'memium/primitives';
 
-export type BuiltinType = BuiltinNumber | 'void' | 'bool';
+export type BuiltinType = TypeName | 'void' | 'bool';
 
 export function isBuiltin(type: string): type is BuiltinType {
 	return isPrimitive(type) || type == 'void' || type == 'bool';
