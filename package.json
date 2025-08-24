@@ -7,12 +7,11 @@
 	"types": "dist/index.d.ts",
 	"keywords": [],
 	"bin": {
-		"xcompile": "./cli.js"
+		"xcompile": "./dist/cli.js"
 	},
 	"files": [
 		"dist",
-		"license.md",
-		"cli.js"
+		"license.md"
 	],
 	"type": "module",
 	"homepage": "https://github.com/james-pre/xcompile",
@@ -42,6 +41,7 @@
 	},
 	"dependencies": {
 		"@types/node": "^22.10.2",
+		"commander": "^14.0.0",
 		"memium": "^0.3.8",
 		"utilium": "^2.4.0"
 	},

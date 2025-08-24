@@ -45,5 +45,6 @@ export default tseslint.config({
 		'@typescript-eslint/no-redundant-type-constituents': 'warn',
 		'@typescript-eslint/only-throw-error': 'off',
 		'@typescript-eslint/no-explicit-any': 'off',
+		'@typescript-eslint/no-empty-object-type': 'off',
 	},
 });

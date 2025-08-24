@@ -1,4 +1,4 @@
-import * as xir from './xir.js';
+import * as xir from '../ir.js';
 import { isTypeName } from 'memium/primitives';
 
 function _baseType(typename: string): string {

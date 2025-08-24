@@ -1,6 +1,4 @@
-/* eslint-disable @typescript-eslint/no-empty-object-type */
-
-import * as xir from './xir.js';
+import * as xir from '../ir.js';
 
 interface _Location {
 	offset: number;
@@ -389,7 +387,7 @@ function _parseFirst<T extends xir.Unit>(node: Node): T {
 	return [...parse(node.inner![0])][0] as T;
 }
 
-export function* parse(node: Node): IterableIterator<xir.Unit> {
+export function* parse(node: Node): Generator<xir.Unit> {
 	switch (node.kind) {
 		case 'BuiltinType':
 		case 'ConstantArrayType':
@@ -744,3 +742,4 @@ export function* parse(node: Node): IterableIterator<xir.Unit> {
 		}
 	}
 }
+
