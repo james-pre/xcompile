@@ -5,6 +5,7 @@
 		"outDir": "dist",
 		"lib": ["ESNext", "ESNext.Disposable", "Decorators"],
 		"moduleResolution": "NodeNext",
+		"rootDir": "src",
 		"declaration": true,
 		"strict": true,
 		"resolveJsonModule": true
