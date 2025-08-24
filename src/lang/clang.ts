@@ -742,4 +742,3 @@ export function* parse(node: Node): Generator<xir.Unit> {
 		}
 	}
 }
-
