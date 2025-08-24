@@ -40,7 +40,7 @@
 		"prepublishOnly": "npm run build"
 	},
 	"dependencies": {
-		"@types/node": "^22.10.2",
+		"@types/node": "^24.3.0",
 		"commander": "^14.0.0",
 		"memium": "^0.3.8",
 		"utilium": "^2.4.0"

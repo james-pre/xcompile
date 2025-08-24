@@ -57,10 +57,9 @@ const ir = (() => {
 	if (source == 'clang-ast') return [...clang.parse(JSON.parse(readFileSync(input, 'utf8')))];
 
 	if (source == 'c') {
-		const json = execSync('clang -cc1 -ast-dump=json ' + input, {
-			stdio: ['inherit', 'pipe', 'inherit'],
-			encoding: 'utf-8',
-		});
+		const tmp = `/tmp/xcompile-${Math.random().toString(36).slice(2)}.json`;
+		execSync('clang -cc1 -ast-dump=json > ' + tmp);
+		const json = readFileSync(tmp, 'utf8');
 		return [...clang.parse(JSON.parse(json))];
 	}
 
