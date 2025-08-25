@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (c) 2025 James Prevett
 import * as xir from '../ir.js';
-import { createIssueHelpers, emitIssue, Location as IssueLocation } from '../issue.js';
+import { __entry, createIssueHelpers, getSource } from '../issue.js';
 
 interface _Location {
 	offset: number;
@@ -15,26 +15,34 @@ interface _Location {
 	isMacroArgExpansion?: boolean;
 }
 
-export type Location = {} | _Location | { spellingLoc: _Location; expansionLoc: _Location };
+export type Location = _Location | { spellingLoc: _Location; expansionLoc: _Location };
 
-/**
- * Parse a location from Clang's format into our IR's format
- */
-export function parseLocation(loc: Location): IssueLocation | undefined {
-	if ('expansionLoc' in loc) loc = loc.expansionLoc;
+function _parseLocation(loc: Location | undefined): _Location | undefined {
+	if (!loc) return;
+	if ('expansionLoc' in loc) {
+		if (typeof loc.expansionLoc.line == 'number') loc = loc.expansionLoc;
+		else loc = { ...loc.expansionLoc };
+	}
 	if (!('offset' in loc)) return;
-
-	return {
-		line: loc.line,
-		column: loc.col,
-		position: loc.offset,
-		unit: loc.file ?? loc.includedFrom?.file ?? '<unknown>',
-	};
+	return loc;
 }
 
-const { error, warning, note, debug } = createIssueHelpers<Node>(node => {
-	if ('loc' in node) return parseLocation(node.loc);
-	else if (node.range) return parseLocation(node.range.begin);
+const { error, warning, note, debug } = createIssueHelpers<Node>(function __nodeToIssueInit(node) {
+	let rawLoc = _parseLocation('loc' in node ? node.loc : node.range?.begin);
+	if (!rawLoc) return {};
+
+	let alt = _parseLocation(node.range?.end);
+
+	return {
+		location: {
+			line: rawLoc.line ?? alt?.line,
+			column: rawLoc.col ?? alt?.col,
+			position: rawLoc.offset,
+			unit: rawLoc.file ?? rawLoc.includedFrom?.file ?? __entry ?? '<unknown>',
+			length: rawLoc.tokLen,
+		},
+		source: getSource(rawLoc.file ?? rawLoc.includedFrom?.file ?? __entry, rawLoc.offset),
+	};
 });
 
 export type ValueCategory = 'prvalue' | 'lvalue' | 'rvalue';
@@ -577,12 +585,8 @@ export function* parse(node: Node): Generator<xir.Unit> {
 			const subRecords: xir.RecordLike[] = [];
 			let lastSubRecord: number | undefined;
 
-			const kind = node.kind == 'EnumDecl' ? 'enum' : node.tagUsed!;
-
-			if (!node.inner) debug(`${kind} ${node.name ?? 'with id ' + node.id} has no fields`, node);
-
 			yield {
-				kind,
+				kind: node.kind == 'EnumDecl' ? 'enum' : node.tagUsed!,
 				name: node.name ?? '_' + node.id,
 				subRecords,
 				complete: node.completeDefinition,
@@ -725,7 +729,9 @@ export function* parse(node: Node): Generator<xir.Unit> {
 				],
 				post: {
 					type: 'call',
-					args: node.inner?.flatMap(node => [...parse(node)]) as xir.Expression[],
+					args:
+						node.inner?.flatMap(node => [...parse(node)] as xir.Expression[]) ??
+						(warning('Static assert is empty', node), []),
 				},
 			};
 			return;
@@ -755,7 +761,12 @@ export function* parse(node: Node): Generator<xir.Unit> {
 						content: node.name!,
 					},
 				],
-				post: { type: 'call', args: node.inner?.flatMap(node => [...parse(node)]) as xir.Expression[] },
+				post: {
+					type: 'call',
+					args:
+						node.inner?.flatMap(node => [...parse(node)] as xir.Expression[]) ??
+						(warning('Empty unary or type trait expression' + ` [${node.id}]`, node), []),
+				},
 			};
 			return;
 		}

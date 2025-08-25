@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (c) 2025 James Prevett
 
+import { openSync, readSync } from 'node:fs';
 import { styleText } from 'node:util';
 
 /**
@@ -14,10 +15,11 @@ export interface Location {
 	 * The file, internal module, shared object, etc.
 	 */
 	unit?: string;
+	length?: number;
 }
 
 export function locationText(loc: Location): string {
-	return `${loc.unit ? loc.unit + ':' : ''}${loc.line}:${loc.column}`;
+	return styleText('whiteBright', `${loc.unit ? loc.unit + ':' : ''}${loc.line ?? '??'}:${loc.column ?? '??'}`);
 }
 
 export interface Issue {
@@ -41,18 +43,18 @@ type IssueHelperName = Lowercase<(typeof issueTypes)[number]>;
 
 export type IssueHelpers<I> = Record<IssueHelperName, (message: string, init: I) => Issue>;
 
-export function createIssueHelpers<const I>(parse: (input: I) => Location | undefined): IssueHelpers<I> {
+export function createIssueHelpers<const I>(parse: (input: I) => Pick<Issue, 'location' | 'source'>): IssueHelpers<I> {
 	const helpers = {} as IssueHelpers<I>;
 
 	for (const key of issueTypes) {
 		helpers[key.toLowerCase() as Lowercase<typeof key>] = function __reportIssue(message: string, init: I) {
 			const issue: Issue = {
-				location: parse(init),
-				source,
+				...parse(init),
 				message,
 				level: IssueLevel[key],
 			};
 
+			emitIssue(issue);
 			return issue;
 		};
 	}
@@ -60,18 +62,9 @@ export function createIssueHelpers<const I>(parse: (input: I) => Location | unde
 	return helpers;
 }
 
-let source: string | undefined;
-
-export function setIssueSource(newSource: string) {
-	source = newSource;
-}
-
-/**
- * Placed into ANSI escape code
- */
 const colors = {
 	[IssueLevel.Error]: 'red',
-	[IssueLevel.Warning]: 'yellowBright',
+	[IssueLevel.Warning]: 'yellow',
 	[IssueLevel.Note]: 'cyan',
 	[IssueLevel.Debug]: 'dim',
 } as const satisfies Record<IssueLevel, string>;
@@ -98,30 +91,60 @@ export interface IssueFormatting {
 	trace: boolean;
 }
 
+/**
+ * The entry point for the "current" file being processed.
+ * Used for last-ditch attempt at getting an issue's source file name
+ */
+export let __entry: string | undefined;
+
+export function __setEntry(entry: string) {
+	__entry = entry;
+}
+
+const openFiles = new Map<string, number>();
+
+export function getSource(path: string | undefined, offset: number): string | undefined {
+	if (!path) return undefined;
+	if (!openFiles.has(path)) {
+		const fd = openSync(path, 'r');
+		openFiles.set(path, fd);
+	}
+
+	const fd = openFiles.get(path)!;
+	// Max 80 chars, 40 before and 40 after
+	const length = offset < 40 ? 80 - offset : 80;
+	const data = new Uint8Array(length);
+	readSync(fd, data, 0, length, Math.max(0, offset - 40));
+
+	return new TextDecoder().decode(data).replaceAll('\0', '');
+}
+
 export function stringifyIssue(i: Issue, options: Partial<IssueFormatting>): string {
 	const level = options.colors ? styleText([colors[i.level], 'bold'], IssueLevel[i.level]) : IssueLevel[i.level];
 
-	const trace = options.trace ? ' ' + extractTrace(i.stack) : '';
+	const trace = options.trace && i.stack ? ' ' + extractTrace(i.stack) : '';
 
-	const message = `${level}: ${i.message}${trace}`;
+	const message = level + styleText(colors[i.level], ': ' + i.message + trace);
 
 	if (!i.location) return message;
-	if (!i.source) return `${locationText(i.location)}\n${message}`;
+	if (!i.source) return `${locationText(i.location)}: ${message}`;
 
-	const lineText = i.source.split('\n')[i.location.line - 1];
+	let { column, position, length = 1 } = i.location;
+	let text = i.source;
 
-	let { column } = i.location,
-		excerpt = lineText;
+	// exactly how far into the data the `position` is
+	const offset = position < 40 ? position : 40;
 
-	// Max 80 chars, 40 before and 40 after
+	const maybeBreakAfter = text.slice(offset).indexOf('\n');
+	if (maybeBreakAfter !== -1) text = text.slice(0, offset + maybeBreakAfter);
 
-	if (lineText.length > 80) {
-		const offset = Math.max(0, column - 40);
-		excerpt = lineText.slice(offset, column + 40);
-		column -= offset;
-	}
+	const maybeBreakBefore = text.slice(0, offset).lastIndexOf('\n');
+	if (maybeBreakBefore !== -1) text = text.slice(maybeBreakBefore + 1); // Note `dataOffset` is no longer usable/valid
 
-	return `${locationText(i.location)}\n\t${excerpt}\n\t${' '.repeat(column)}^\n${message}`;
+	const nLeadingTabs = text.match(/^\t*/)?.[0].length || 0;
+	const leftPadding = 3 + column + nLeadingTabs * 3;
+
+	return `${locationText(i.location)}: ${message}\n    ${text.replaceAll('\t', '    ')}\n${' '.repeat(leftPadding)}^${'~'.repeat(length - 1)}`;
 }
 
 const handlers = new Set<(issue: Issue) => unknown>();

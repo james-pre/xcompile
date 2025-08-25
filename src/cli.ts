@@ -5,7 +5,7 @@ import { program } from 'commander';
 import { writeFileSync } from 'node:fs';
 import { parseArgs, styleText } from 'node:util';
 import $pkg from '../package.json' with { type: 'json' };
-import { emit, parse, xir } from './index.js';
+import { emit, IssueLevel, onIssue, parse, stringifyIssue, xir } from './index.js';
 
 // @todo implement CLI using commander.
 program
@@ -22,9 +22,11 @@ const {
 	options: {
 		output: { short: 'o', type: 'string' },
 		help: { short: 'h', type: 'boolean' },
-		version: { short: 'v', type: 'boolean' },
-		verbose: { short: 'w', type: 'boolean' },
+		version: { short: 'V', type: 'boolean' },
+		verbose: { short: 'v', type: 'boolean' },
 		'ignore-exit': { short: 'k', type: 'boolean' },
+		'allow-dupe': { type: 'boolean' },
+		'issue-entry': { type: 'string' },
 	},
 	allowPositionals: true,
 });
@@ -45,10 +47,12 @@ Targets:
 
 Options:
 	-h, --help           Display this help message
-	-v, --version        Display version information and exit
-	-w, --verbose        Display verbose messages
+	-V, --version        Display version information and exit
+	-v, --verbose        Display verbose messages
 	-o, --output <path>  Write output to path
-	-k, --ignore-exit    Ignore the exit code of sub-shells`);
+	-k, --ignore-exit    Ignore the exit code of sub-shells
+	    --allow-dupe     Report duplicate issues
+	    --issue-entry    Set the entry point used when computing issue messages`);
 	process.exit(1);
 }
 
@@ -56,9 +60,19 @@ let [source, target, ...rest] = formats.split(':');
 
 if (rest.length) console.log('Ignoring: ' + rest.join(', '));
 
+let reported = new Set<string>();
+
+onIssue(i => {
+	if (i.level == IssueLevel.Debug && !opt.verbose) return;
+	const content = stringifyIssue(i, { colors: true, trace: opt.verbose });
+	if (reported.has(content) && !opt['allow-dupe']) return;
+	reported.add(content);
+	console.error(content);
+});
+
 let ir: Iterable<xir.Unit>;
 try {
-	ir = parse(source, input, { ignoreExit: opt['ignore-exit'] });
+	ir = parse(source, input, { ignoreExit: opt['ignore-exit'], issueEntry: opt['issue-entry'] });
 } catch (err: any) {
 	console.error(styleText('red', err instanceof Error ? err.stack : err.toString()));
 	process.exit(1);

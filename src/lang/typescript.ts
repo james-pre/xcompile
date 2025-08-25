@@ -91,7 +91,7 @@ export function emit(u: xir.Unit): string {
 			);
 		}
 		case 'return':
-			return 'return ' + emitList(u.value);
+			return 'return ' + emitList(u.value, u.value.length <= 1);
 		case 'if':
 			return `if ${emitList(u.condition)}\n${emitBlock(u.body)} ${!u.else ? '' : '\nelse ' + (u.else[0].kind == 'if' ? emitBlock(u.else) : emitBlock(u.else))}`;
 		case 'while':
@@ -136,7 +136,7 @@ export function emit(u: xir.Unit): string {
 				case 'access_ref':
 					return primary + '._ref.' + u.post.key;
 				case 'bracket_access':
-					return primary + `[${emitList(u.post.key)}]`;
+					return primary + `[${emitList(u.post.key, true)}]`;
 				case 'call':
 					return primary + emitList(u.post.args);
 				default:
