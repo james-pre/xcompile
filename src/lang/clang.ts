@@ -436,11 +436,35 @@ export type Node =
 	| UnaryExprOrTypeTraitExpr
 	| Value;
 
-function _parseFirst<T extends xir.Unit>(node: Node): T {
-	return [...parse(node.inner![0])][0] as T;
+interface InterruptLike {
+	$interrupt: true;
+	kind: string;
+	node?: Node;
 }
 
-export function* parse(node: Node): Generator<xir.Unit> {
+interface RecoveryInterrupt extends InterruptLike {
+	kind: 'invalid_recovery';
+	node: RecoveryExpr;
+}
+
+type Interrupt = RecoveryInterrupt;
+
+function isInterrupt(value: unknown): value is Interrupt {
+	return typeof value == 'object' && value != null && '$interrupt' in value && 'kind' in value;
+}
+
+function interrupt<T extends Interrupt>(init: Omit<T, `$${string}`>): never {
+	throw {
+		...init,
+		$interrupt: true,
+	} satisfies Interrupt;
+}
+
+function _parseFirst<T extends xir.Unit>(node: Node): T {
+	return parse<T>(node.inner![0])[0];
+}
+
+function* parseRaw(node: Node): Generator<xir.Unit> {
 	switch (node.kind) {
 		case 'BuiltinType':
 		case 'ConstantArrayType':
@@ -477,8 +501,8 @@ export function* parse(node: Node): Generator<xir.Unit> {
 			const [name, index] = node.inner!;
 			yield {
 				kind: 'postfixed',
-				primary: [...parse(name)] as xir.Expression[],
-				post: { type: 'bracket_access', key: [...parse(index)] as xir.Expression[] },
+				primary: parse(name),
+				post: { type: 'bracket_access', key: parse(index) },
 			};
 			return;
 		}
@@ -498,8 +522,8 @@ export function* parse(node: Node): Generator<xir.Unit> {
 			yield {
 				kind: node.kind == 'BinaryOperator' ? 'binary' : 'assignment',
 				operator: node.opcode,
-				left: [...parse(left)] as xir.Expression[],
-				right: [...parse(right)] as xir.Expression[],
+				left: parse(left),
+				right: parse(right),
 			} as xir.Assignment | xir.Binary;
 			return;
 		}
@@ -513,8 +537,8 @@ export function* parse(node: Node): Generator<xir.Unit> {
 			const [ident, ...args] = node.inner!;
 			yield {
 				kind: 'postfixed',
-				primary: [...parse(ident)] as xir.Expression[],
-				post: { type: 'call', args: args.flatMap(node => [...parse(node)]) as xir.Expression[] },
+				primary: parse(ident),
+				post: { type: 'call', args: args.flatMap<xir.Expression>(parse) },
 			};
 			return;
 		}
@@ -539,20 +563,17 @@ export function* parse(node: Node): Generator<xir.Unit> {
 		case 'ParenExpr':
 		case 'TranslationUnitDecl':
 		case 'StmtExpr':
-			for (const inner of node.inner ?? []) {
-				yield* parse(inner);
-			}
+			for (const inner of node.inner ?? []) yield* parse(inner);
 			return;
 		case 'RecoveryExpr':
-			// @todo bail
-			return;
+			interrupt({ kind: 'invalid_recovery', node });
 		case 'ConditionalOperator': {
 			const [condition, _true, _false] = node.inner!;
 			yield {
 				kind: 'ternary',
-				condition: [...parse(condition)] as xir.Expression[],
-				true: [...parse(_true)] as xir.Expression[],
-				false: [...parse(_false)] as xir.Expression[],
+				condition: parse(condition),
+				true: parse(_true),
+				false: parse(_false),
 			};
 			return;
 		}
@@ -573,8 +594,8 @@ export function* parse(node: Node): Generator<xir.Unit> {
 			yield {
 				kind: 'while',
 				isDo: true,
-				condition: [...parse(_cond)] as xir.Expression[],
-				body: [...parse(_body)],
+				condition: parse(_cond),
+				body: parse(_body),
 			};
 			return;
 		}
@@ -583,7 +604,7 @@ export function* parse(node: Node): Generator<xir.Unit> {
 				kind: 'assignment',
 				operator: '=',
 				left: [{ kind: 'value', type: { kind: 'plain', text: 'any' }, content: node.name! }],
-				right: [...parse(node.inner![0])] as xir.Expression[],
+				right: parse(node.inner![0]),
 			};
 			return;
 		case 'VarDecl':
@@ -612,9 +633,9 @@ export function* parse(node: Node): Generator<xir.Unit> {
 							if (i - 1 === lastSubRecord) {
 								node.type.qualType = subRecords.at(-1)?.name ?? node.type.qualType;
 							}
-							return [...parse(node)];
+							return parse(node);
 						}
-						subRecords.push(...(parse(node) as IterableIterator<xir.RecordLike>));
+						for (const u of parse<xir.RecordLike>(node)) subRecords.push(u);
 						lastSubRecord = i;
 						return [];
 					})
@@ -650,10 +671,10 @@ export function* parse(node: Node): Generator<xir.Unit> {
 			const [_init, , _cond, _action, ..._body] = node.inner;
 			yield {
 				kind: 'for',
-				init: [...parse(_init)] as xir.Expression[],
-				condition: [...parse(_cond)] as xir.Expression[],
-				action: [...parse(_action)] as xir.Expression[],
-				body: _body.flatMap(node => [...parse(node)]),
+				init: parse(_init),
+				condition: parse(_cond),
+				action: parse(_action),
+				body: _body.flatMap(parse),
 			};
 			return;
 		}
@@ -675,7 +696,7 @@ export function* parse(node: Node): Generator<xir.Unit> {
 							name: param.name ?? '__' + i,
 							type: parseType(param),
 						})) ?? [],
-				body: body ? [...parse(body)] : [],
+				body: body ? parse(body) : [],
 				storage: node.storageClass,
 			};
 			return;
@@ -685,14 +706,14 @@ export function* parse(node: Node): Generator<xir.Unit> {
 			return;
 		case 'IfStmt': {
 			const [condition, body, _else] = node.inner!;
-			const elseUnits = node.hasElse ? [...parse(_else)] : undefined;
+			const elseUnits = node.hasElse ? parse(_else) : undefined;
 			if (elseUnits && !elseUnits.length)
 				warning("Else block is missing body. This could be a bug with Clang's AST.", node);
 
 			yield {
 				kind: 'if',
-				condition: [...parse(condition)] as xir.Expression[],
-				body: [...parse(body)],
+				condition: parse(condition),
+				body: parse(body),
 				else: elseUnits,
 			};
 			return;
@@ -717,7 +738,7 @@ export function* parse(node: Node): Generator<xir.Unit> {
 		case 'MemberExpr':
 			yield {
 				kind: 'postfixed',
-				primary: [...parse(node.inner[0])] as xir.Expression[],
+				primary: parse(node.inner[0]),
 				post: { type: 'access', key: node.name },
 			};
 			return;
@@ -728,7 +749,7 @@ export function* parse(node: Node): Generator<xir.Unit> {
 			yield { kind: 'comment', text: node.kind.slice(0, -4) };
 			return;
 		case 'ReturnStmt':
-			yield { kind: 'return', value: !node.inner ? [] : ([...parse(node.inner[0])] as xir.Expression[]) };
+			yield { kind: 'return', value: !node.inner ? [] : parse(node.inner[0]) };
 			return;
 		case 'StaticAssertDecl': {
 			const [condition, message] = node.inner ?? [];
@@ -748,9 +769,7 @@ export function* parse(node: Node): Generator<xir.Unit> {
 				],
 				post: {
 					type: 'call',
-					args:
-						node.inner?.flatMap(node => [...parse(node)] as xir.Expression[]) ??
-						(warning('Static assert is empty', node), []),
+					args: node.inner?.flatMap<xir.Expression>(parse) ?? (warning('Static assert is empty', node), []),
 				},
 			};
 			return;
@@ -759,8 +778,8 @@ export function* parse(node: Node): Generator<xir.Unit> {
 			const [_expr, ..._body] = node.inner;
 			yield {
 				kind: 'switch',
-				expression: [...parse(_expr)] as xir.Expression[],
-				body: _body.flatMap(child => [...parse(child)]),
+				expression: parse(_expr),
+				body: _body.flatMap(parse),
 			};
 			return;
 		}
@@ -803,7 +822,7 @@ export function* parse(node: Node): Generator<xir.Unit> {
 										content: JSON.stringify(parseBaseType(node.argType?.qualType ?? 'bool')),
 									},
 								]
-							: (node.inner?.flatMap(node => [...parse(node)] as xir.Expression[]) ??
+							: (node.inner?.flatMap<xir.Expression>(parse) ??
 								(warning('Empty unary or type trait expression', node), [])),
 				},
 			};
@@ -813,7 +832,7 @@ export function* parse(node: Node): Generator<xir.Unit> {
 			yield {
 				kind: 'unary',
 				operator: node.opcode,
-				expression: [...parse(node.inner[0])] as xir.Expression[],
+				expression: parse(node.inner[0]),
 			};
 			return;
 		case 'WarnUnusedResultAttr':
@@ -824,10 +843,26 @@ export function* parse(node: Node): Generator<xir.Unit> {
 			yield {
 				kind: 'while',
 				isDo: true,
-				condition: [...parse(_cond)] as xir.Expression[],
-				body: [...parse(_body)],
+				condition: parse(_cond),
+				body: parse(_body),
 			};
 			return;
+		}
+	}
+}
+
+export function parse<T extends xir.Unit>(node: Node): T[] {
+	const result: T[] = [];
+
+	try {
+		for (const unit of parseRaw(node)) result.push(unit as T);
+		return result;
+	} catch (int) {
+		if (!isInterrupt(int)) throw int;
+		switch (int.kind) {
+			case 'invalid_recovery':
+				warning('Recovered from invalid expression', int.node);
+				return [];
 		}
 	}
 }
