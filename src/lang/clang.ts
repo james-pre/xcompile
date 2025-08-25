@@ -672,6 +672,7 @@ export function* parse(node: Node): Generator<xir.Unit> {
 			const elseUnits = node.hasElse ? [...parse(_else)] : undefined;
 			if (elseUnits && !elseUnits.length)
 				warning("Else block is missing body. This could be a bug with Clang's AST.", node);
+
 			yield {
 				kind: 'if',
 				condition: [...parse(condition)] as xir.Expression[],
@@ -765,7 +766,7 @@ export function* parse(node: Node): Generator<xir.Unit> {
 					type: 'call',
 					args:
 						node.inner?.flatMap(node => [...parse(node)] as xir.Expression[]) ??
-						(warning('Empty unary or type trait expression' + ` [${node.id}]`, node), []),
+						(warning('Empty unary or type trait expression', node), []),
 				},
 			};
 			return;

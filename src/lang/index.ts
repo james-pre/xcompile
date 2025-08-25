@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (c) 2025 James Prevett
-import { execSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import $pkg from '../../package.json' with { type: 'json' };
 import * as xir from '../ir.js';
+import { __setEntry } from '../issue.js';
 import * as clang from './clang.js';
 import * as ts from './typescript.js';
 import { cToTypescriptHeader } from './x-specific.js';
-import { __setEntry } from '../issue.js';
 
 export { clang, ts };
 
@@ -26,14 +26,16 @@ export function parse(lang: string, file: string, opts: ParseOptions): Iterable<
 		case 'clang-ast':
 			return clang.parse(JSON.parse(readFileSync(file, 'utf8')));
 		case 'c': {
-			const tmp = `/tmp/xcompile-${Math.random().toString(36).slice(2)}.json`;
 			__setEntry(file);
-			try {
-				execSync(`clang -Xclang -ast-dump=json ${file} > ${tmp}`, { stdio: 'inherit' });
-			} catch (err: any) {
-				if (!opts.ignoreExit) throw err.toString();
-			}
-			const json = readFileSync(tmp, 'utf8');
+
+			const { stdout: json, error } = spawnSync('clang', ['-Xclang', '-ast-dump=json', file], {
+				stdio: ['inherit', 'pipe', 'inherit'],
+				encoding: 'utf-8',
+				maxBuffer: 1024 ** 4,
+			});
+
+			if (error && !opts.ignoreExit) throw error.toString();
+
 			return [...clang.parse(JSON.parse(json))];
 		}
 		default:

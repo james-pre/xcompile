@@ -133,16 +133,19 @@ export function stringifyIssue(i: Issue, options: Partial<IssueFormatting>): str
 	let text = i.source;
 
 	// exactly how far into the data the `position` is
-	const offset = position < 40 ? position : 40;
+	let offset = position < 40 ? position : 40;
 
 	const maybeBreakAfter = text.slice(offset).indexOf('\n');
 	if (maybeBreakAfter !== -1) text = text.slice(0, offset + maybeBreakAfter);
 
 	const maybeBreakBefore = text.slice(0, offset).lastIndexOf('\n');
-	if (maybeBreakBefore !== -1) text = text.slice(maybeBreakBefore + 1); // Note `dataOffset` is no longer usable/valid
+	if (maybeBreakBefore !== -1) {
+		text = text.slice(maybeBreakBefore + 1);
+		offset -= maybeBreakBefore + 1;
+	}
 
 	const nLeadingTabs = text.match(/^\t*/)?.[0].length || 0;
-	const leftPadding = 3 + column + nLeadingTabs * 3;
+	const leftPadding = 3 + (offset < 40 ? column : offset + 1) + nLeadingTabs * 3;
 
 	return `${locationText(i.location)}: ${message}\n    ${text.replaceAll('\t', '    ')}\n${' '.repeat(leftPadding)}^${'~'.repeat(length - 1)}`;
 }
