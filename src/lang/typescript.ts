@@ -25,11 +25,13 @@ function emitType(type: xir.Type, namespace?: string): string {
 				: `/* ${type.qualifier} */ ${emitType(type.inner, namespace)}`;
 		case 'namespaced':
 			return emitType(type.inner, namespace);
+		case 'typeof':
+			return `$typeof<${emitType(type.target, namespace)}>`;
 	}
 }
 
 function emitBlock(block: xir.Unit[], noSemi: boolean = false): string {
-	return `{\n${block.map(emit).join((noSemi ? '' : ';') + '\n')}\n}`;
+	return `{\n${block.map(emit).join((noSemi ? '' : ';') + '\n')}\n}\n`;
 }
 
 function emitList(expr: xir.Unit[], noParans: boolean = false): string {
@@ -65,8 +67,12 @@ function emitFieldType(type: xir.Type | null): string {
 			return emitFieldType(type.inner);
 		case 'function':
 			return 'Void /* function */';
+		case 'typeof':
+			return `$__typeof(${emitFieldType(type.target)})`;
 	}
 }
+
+const reserved = ['class', 'new'];
 
 function emitValue(value: xir.Value): string {
 	if (typeof value.content == 'object' && 'map' in value.content)
@@ -76,24 +82,29 @@ function emitValue(value: xir.Value): string {
 
 	// if (value.content.startsWith('"') && value.content.endsWith('"')) return `$__str(${value.content})`;
 
-	return value.content;
+	return reserved.includes(value.content) ? '_' + value.content : value.content;
+}
+
+function emitName(node: { name: string }): string {
+	if (reserved.includes(node.name)) return '_' + node.name;
+	return node.name;
 }
 
 export function emit(u: xir.Unit): string {
 	switch (u.kind) {
 		case 'function': {
-			const signature = `function ${u.name} (${emitParameters(u.parameters)}): ${emitType(u.returns)}`;
+			const signature = `function ${emitName(u)} (${emitParameters(u.parameters)}): ${emitType(u.returns)}`;
 			return (
 				(u.exported ? 'export ' : '') +
 				(u.storage == 'extern' || !u.body.length
-					? `declare ${signature};`
+					? `declare ${signature};\n`
 					: signature + '\n' + emitBlock(u.body))
 			);
 		}
 		case 'return':
 			return 'return ' + emitList(u.value, u.value.length <= 1);
 		case 'if':
-			return `if ${emitList(u.condition)}\n${emitBlock(u.body)} ${!u.else ? '' : '\nelse ' + (u.else[0].kind == 'if' ? emitBlock(u.else) : emitBlock(u.else))}`;
+			return `if ${emitList(u.condition)}\n${emitBlock(u.body)} ${!u.else ? '' : '\nelse ' + (!u.else[0] ? '{\n\t// !!! Missing\n}' : u.else[0].kind == 'if' ? emitBlock(u.else) : emitBlock(u.else))}`;
 		case 'while':
 			return u.isDo
 				? `do ${emitBlock(u.body)} while ${emitList(u.condition)}`
@@ -152,22 +163,22 @@ export function emit(u: xir.Unit): string {
 
 			const _export = u.exported ? 'export ' : '';
 
-			if (!u.complete) return _export + `declare const ${u.name}: StructConstructor<unknown>;`;
+			if (!u.complete) return _export + `declare const ${emitName(u)}: StructConstructor<unknown>;`;
 
-			return `${_export} const ${u.name} = ${u.kind == 'struct' ? 'struct' : 'union'}("${u.name}", {\n${u.fields.map(f => `\t${f.name}: ${emitFieldType(f.type)}`).join(',\n')}\n});\n${_export}interface ${u.name} extends InstanceType<typeof ${u.name}> {};\n`;
+			return `${_export} const ${emitName(u)} = ${u.kind == 'struct' ? 'struct' : 'union'}("${u.name}", {\n${u.fields.map(f => `\t${f.name}: ${emitFieldType(f.type)}`).join(',\n')}\n});\n${_export}interface ${emitName(u)} extends InstanceType<typeof ${emitName(u)}> {};\n`;
 		}
 		case 'enum':
-			return `\n${u.exported ? 'export ' : ''}enum ${u.name} ${emitBlock(u.fields, true)}`;
+			return `\n${u.exported ? 'export ' : ''}enum ${emitName(u)} ${emitBlock(u.fields, true)}`;
 		case 'type_alias':
-			if (u.name == emitType(u.value)) return '';
-			return `type ${u.name} = ${emitType(u.value)};\n`;
+			if (emitName(u) == emitType(u.value)) return '';
+			return `type ${emitName(u)} = ${emitType(u.value)};\n`;
 		case 'declaration':
-			return `\n${u.exported ? 'export ' : ''}${u.storage == 'extern' ? 'declare ' : ''}let ${u.name}${u.type ? ': ' + emitType(u.type) : ''} ${u.initializer === undefined ? '' : ' = ' + emit(u.initializer)};`;
+			return `\n${u.exported ? 'export ' : ''}${u.storage == 'extern' ? 'declare ' : ''}let ${emitName(u)}${u.type ? ': ' + emitType(u.type) : ''} ${u.initializer === undefined ? '' : ' = ' + emit(u.initializer)};`;
 		case 'enum_field':
-			return `${u.name} ${u.value === undefined ? '' : ' = ' + emit(u.value)},`;
+			return `${emitName(u)} ${u.value === undefined ? '' : ' = ' + emit(u.value)},`;
 		case 'field':
 		case 'parameter':
-			return `${u.name ?? 'undefined_' + u.index}${u.type ? ': ' + emitType(u.type) : ''} ${!u.initializer ? '' : ' = ' + emit(u.initializer)}`;
+			return `${u.name ? emitName(u) : 'undefined_' + u.index}${u.type ? ': ' + emitType(u.type) : ''} ${!u.initializer ? '' : ' = ' + emit(u.initializer)}`;
 		case 'value':
 			return emitValue(u);
 		case 'comment':

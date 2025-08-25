@@ -28,7 +28,7 @@
 	},
 	"exports": {
 		".": "./dist/index.js",
-		"./*": "./dist/*"
+		"./*": "./dist/*.js"
 	},
 	"scripts": {
 		"format": "prettier --write .",

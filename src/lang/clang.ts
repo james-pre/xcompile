@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (c) 2025 James Prevett
+import { omit } from 'utilium';
 import * as xir from '../ir.js';
 import { __entry, createIssueHelpers, getSource } from '../issue.js';
 
@@ -186,6 +187,7 @@ const _type_function_pointer = /([^(]+)\s+\(\*\)\s*\((.*)\)/;
 const _type_array = /(.*)\[(\d*)\]$/;
 const _type_pointer = /(.*)\s*\*(?:restrict)?$/;
 const _type_qualified = /^(const|volatile)(\W+.*)|(.*\W+)(const|volatile)$/;
+const _type_typeof = /^typeof\s*\((.*)\)$/;
 
 function parseType(type: string | Node, raw?: string, alt?: string, _isRaw: boolean = false): xir.Type {
 	if (!type) return { kind: 'plain', text: 'unknown' };
@@ -222,6 +224,9 @@ function parseType(type: string | Node, raw?: string, alt?: string, _isRaw: bool
 		const args = fn_args.split(',').map(v => parseType(v.trim()));
 		return { kind: 'function', returns: parseType(fn_returns), args };
 	}
+
+	const [isTypeOf, typeofTarget] = type.match(_type_typeof) ?? [];
+	if (isTypeOf) return { kind: 'typeof', target: parseType(typeofTarget.trim()) };
 
 	const [isNs, namespace, inner] = type.match(_type_namespace) ?? [];
 	if (isNs) return { kind: 'namespaced', namespace, inner: parseType(inner.trim()) };
@@ -344,7 +349,7 @@ export interface UnaryExprOrTypeTraitExpr extends GenericNode {
 	kind: 'UnaryExprOrTypeTraitExpr';
 	valueCategory: ValueCategory;
 	value?: string;
-	argType: TypeInfo;
+	argType?: TypeInfo;
 }
 
 export interface Member extends GenericNode {
@@ -533,11 +538,13 @@ export function* parse(node: Node): Generator<xir.Unit> {
 		case 'InitListExpr':
 		case 'ParenExpr':
 		case 'TranslationUnitDecl':
-		case 'RecoveryExpr':
 		case 'StmtExpr':
 			for (const inner of node.inner ?? []) {
 				yield* parse(inner);
 			}
+			return;
+		case 'RecoveryExpr':
+			// @todo bail
 			return;
 		case 'ConditionalOperator': {
 			const [condition, _true, _false] = node.inner!;
@@ -765,12 +772,23 @@ export function* parse(node: Node): Generator<xir.Unit> {
 			return;
 		case 'UnaryExprOrTypeTraitExpr': {
 			// `sizeof(x)` or a macro
+
 			yield {
 				kind: 'postfixed',
 				primary: [
 					{
 						kind: 'value',
-						type: { kind: 'function', returns: parseType(node), args: [parseType(node.argType.qualType)] },
+						type: {
+							kind: 'function',
+							returns: parseType(node),
+							args: node.argType
+								? [parseType(node.argType.qualType)]
+								: (warning(
+										`Missing argument type ${JSON.stringify(omit(node, 'inner', 'id', 'range'))}`,
+										node
+									),
+									[]),
+						},
 						content: node.name!,
 					},
 				],
@@ -782,7 +800,7 @@ export function* parse(node: Node): Generator<xir.Unit> {
 									{
 										kind: 'value',
 										type: { kind: 'plain', text: 'string' },
-										content: JSON.stringify(parseBaseType(node.argType.qualType)),
+										content: JSON.stringify(parseBaseType(node.argType?.qualType ?? 'bool')),
 									},
 								]
 							: (node.inner?.flatMap(node => [...parse(node)] as xir.Expression[]) ??

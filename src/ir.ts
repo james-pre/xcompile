@@ -25,6 +25,8 @@ export function baseType(type: Type): string {
 		case 'qual':
 		case 'namespaced':
 			return baseType(type.inner);
+		case 'typeof':
+			return baseType(type.target);
 	}
 }
 
@@ -36,7 +38,8 @@ export type Type =
 	| { kind: 'ref'; to: Type; restricted?: boolean }
 	| { kind: 'function'; returns: Type; args: Type[] }
 	| { kind: 'qual'; qualifier: TypeQualifier; inner: Type }
-	| { kind: 'namespaced'; namespace: string; inner: Type };
+	| { kind: 'namespaced'; namespace: string; inner: Type }
+	| { kind: 'typeof'; target: Type };
 
 export function typeHasQualifier(type: Type | null, qual: TypeQualifier): boolean {
 	if (!type) return false;
@@ -53,6 +56,8 @@ export function typeHasQualifier(type: Type | null, qual: TypeQualifier): boolea
 			return typeHasQualifier(type.inner, qual);
 		case 'qual':
 			return type.qualifier == qual;
+		case 'typeof':
+			return typeHasQualifier(type.target, qual);
 	}
 }
 
@@ -165,7 +170,7 @@ export interface Function {
 
 export interface RecordLike {
 	kind: 'struct' | 'class' | 'union' | 'enum';
-	name?: string;
+	name: string;
 	complete?: boolean;
 	fields: Declaration[];
 	subRecords: RecordLike[];
@@ -209,6 +214,8 @@ function typeText(type: Type): string {
 			return `${type.qualifier} ${typeText(type.inner)}`;
 		case 'namespaced':
 			return `${type.namespace}:${typeText(type.inner)}`;
+		case 'typeof':
+			return `typeof<${typeText(type.target)}>`;
 	}
 }
 
