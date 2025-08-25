@@ -538,7 +538,7 @@ function* parseRaw(node: Node): Generator<xir.Unit> {
 			yield {
 				kind: 'postfixed',
 				primary: parse(ident),
-				post: { type: 'call', args: args.flatMap<xir.Expression>(parse) },
+				post: { type: 'call', args: args.flatMap(arg => parse<xir.Expression>(arg)) },
 			};
 			return;
 		}
@@ -674,7 +674,7 @@ function* parseRaw(node: Node): Generator<xir.Unit> {
 				init: parse(_init),
 				condition: parse(_cond),
 				action: parse(_action),
-				body: _body.flatMap(parse),
+				body: _body.flatMap(node => parse(node)),
 			};
 			return;
 		}
@@ -712,7 +712,7 @@ function* parseRaw(node: Node): Generator<xir.Unit> {
 
 			yield {
 				kind: 'if',
-				condition: parse(condition),
+				condition: parse(condition, { cascade: true }),
 				body: parse(body),
 				else: elseUnits,
 			};
@@ -769,7 +769,9 @@ function* parseRaw(node: Node): Generator<xir.Unit> {
 				],
 				post: {
 					type: 'call',
-					args: node.inner?.flatMap<xir.Expression>(parse) ?? (warning('Static assert is empty', node), []),
+					args:
+						node.inner?.flatMap(node => parse<xir.Expression>(node)) ??
+						(warning('Static assert is empty', node), []),
 				},
 			};
 			return;
@@ -779,7 +781,7 @@ function* parseRaw(node: Node): Generator<xir.Unit> {
 			yield {
 				kind: 'switch',
 				expression: parse(_expr),
-				body: _body.flatMap(parse),
+				body: _body.flatMap(node => parse(node)),
 			};
 			return;
 		}
@@ -800,13 +802,7 @@ function* parseRaw(node: Node): Generator<xir.Unit> {
 						type: {
 							kind: 'function',
 							returns: parseType(node),
-							args: node.argType
-								? [parseType(node.argType.qualType)]
-								: (warning(
-										`Missing argument type ${JSON.stringify(omit(node, 'inner', 'id', 'range'))}`,
-										node
-									),
-									[]),
+							args: node.argType ? [parseType(node.argType.qualType)] : [],
 						},
 						content: node.name!,
 					},
@@ -822,7 +818,7 @@ function* parseRaw(node: Node): Generator<xir.Unit> {
 										content: JSON.stringify(parseBaseType(node.argType?.qualType ?? 'bool')),
 									},
 								]
-							: (node.inner?.flatMap<xir.Expression>(parse) ??
+							: (node.inner?.flatMap(node => parse<xir.Expression>(node)) ??
 								(warning('Empty unary or type trait expression', node), [])),
 				},
 			};
@@ -851,14 +847,21 @@ function* parseRaw(node: Node): Generator<xir.Unit> {
 	}
 }
 
-export function parse<T extends xir.Unit>(node: Node): T[] {
+interface ParseInternalOptions {
+	/**
+	 * If set, interrupts will cascade upwards.
+	 */
+	cascade?: boolean;
+}
+
+export function parse<T extends xir.Unit>(node: Node, opt: ParseInternalOptions = {}): T[] {
 	const result: T[] = [];
 
 	try {
 		for (const unit of parseRaw(node)) result.push(unit as T);
 		return result;
 	} catch (int) {
-		if (!isInterrupt(int)) throw int;
+		if (!isInterrupt(int) || opt.cascade) throw int;
 		switch (int.kind) {
 			case 'invalid_recovery':
 				warning('Recovered from invalid expression', int.node);
