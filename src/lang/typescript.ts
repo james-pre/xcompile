@@ -154,7 +154,6 @@ export function emit(u: xir.Unit): string {
 
 			if (!u.complete) return _export + `declare const ${u.name}: StructConstructor<unknown>;`;
 
-			if (!u.fields) console.warn(u.name);
 			return `${_export} const ${u.name} = ${u.kind == 'struct' ? 'struct' : 'union'}("${u.name}", {\n${u.fields.map(f => `\t${f.name}: ${emitFieldType(f.type)}`).join(',\n')}\n});\n${_export}interface ${u.name} extends InstanceType<typeof ${u.name}> {};\n`;
 		}
 		case 'enum':

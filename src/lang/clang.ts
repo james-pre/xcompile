@@ -577,13 +577,17 @@ export function* parse(node: Node): Generator<xir.Unit> {
 			const subRecords: xir.RecordLike[] = [];
 			let lastSubRecord: number | undefined;
 
+			const kind = node.kind == 'EnumDecl' ? 'enum' : node.tagUsed!;
+
+			if (!node.inner) debug(`${kind} ${node.name ?? 'with id ' + node.id} has no fields`, node);
+
 			yield {
-				kind: node.kind == 'EnumDecl' ? 'enum' : node.tagUsed!,
+				kind,
 				name: node.name ?? '_' + node.id,
 				subRecords,
 				complete: node.completeDefinition,
-				fields: node.inner
-					?.flatMap((node, i) => {
+				fields: (node.inner ?? [])
+					.flatMap((node, i) => {
 						if (node.kind != 'RecordDecl') {
 							if (i - 1 === lastSubRecord) {
 								node.type.qualType = subRecords.at(-1)?.name ?? node.type.qualType;
