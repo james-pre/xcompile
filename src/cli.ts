@@ -1,11 +1,13 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (c) 2025 James Prevett
 import { program } from 'commander';
+import { writeFileSync } from 'node:fs';
+import { parseArgs, styleText } from 'node:util';
 import $pkg from '../package.json' with { type: 'json' };
-import { readFileSync, writeFileSync } from 'node:fs';
-import { parseArgs } from 'node:util';
-import { clang, ts, xir, versions as v } from './index.js';
-import { execSync } from 'node:child_process';
+import { emit, parse, xir } from './index.js';
 
+// @todo implement CLI using commander.
 program
 	.name('xcompile')
 	.version($pkg.version)
@@ -22,6 +24,7 @@ const {
 		help: { short: 'h', type: 'boolean' },
 		version: { short: 'v', type: 'boolean' },
 		verbose: { short: 'w', type: 'boolean' },
+		'ignore-exit': { short: 'k', type: 'boolean' },
 	},
 	allowPositionals: true,
 });
@@ -44,7 +47,8 @@ Options:
 	-h, --help           Display this help message
 	-v, --version        Display version information and exit
 	-w, --verbose        Display verbose messages
-	-o, --output <path>  Write output to path`);
+	-o, --output <path>  Write output to path
+	-k, --ignore-exit    Ignore the exit code of sub-shells`);
 	process.exit(1);
 }
 
@@ -52,33 +56,21 @@ let [source, target, ...rest] = formats.split(':');
 
 if (rest.length) console.log('Ignoring: ' + rest.join(', '));
 
-// This is surprisingly the most readable way to write this.
-const ir = (() => {
-	if (source == 'clang-ast') return [...clang.parse(JSON.parse(readFileSync(input, 'utf8')))];
-
-	if (source == 'c') {
-		const tmp = `/tmp/xcompile-${Math.random().toString(36).slice(2)}.json`;
-		execSync('clang -cc1 -ast-dump=json > ' + tmp);
-		const json = readFileSync(tmp, 'utf8');
-		return [...clang.parse(JSON.parse(json))];
-	}
-
-	console.error('Invalid source: ' + source);
+let ir: Iterable<xir.Unit>;
+try {
+	ir = parse(source, input, { ignoreExit: opt['ignore-exit'] });
+} catch (err: any) {
+	console.error(styleText('red', err instanceof Error ? err.stack : err.toString()));
 	process.exit(1);
-})();
+}
 
-const content = (() => {
-	if (target == 'ts' || target == 'typescript') {
-		return `/* XCompile ${$pkg.version} */\n${ts.cHeader} ${ir.map(ts.emit).join('')}`;
-	}
-
-	if (target == 'xir-text') {
-		return `XCompile v${$pkg.version}\nXIR format ${v.xir.text}\n${ir.map(xir.text).join('\n')}`;
-	}
-
-	console.error('Invalid target: ' + target);
+let content: string;
+try {
+	content = emit(target, [...ir]);
+} catch (err: any) {
+	console.error(styleText('red', err instanceof Error ? err.stack : err.toString()));
 	process.exit(1);
-})();
+}
 
 if (!opt.output) {
 	console.log('No output file specified.');

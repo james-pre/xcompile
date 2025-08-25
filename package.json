@@ -34,7 +34,7 @@
 		"format": "prettier --write .",
 		"format:check": "prettier --check .",
 		"lint": "tsc -p tsconfig.json --noEmit && eslint src",
-		"build": "tsc -p tsconfig.json",
+		"build": "tsc -p tsconfig.json && chmod +x dist/cli.js",
 		"build:bnf": "npx xcompile-bnf src/bnf.bnf -f json -o src/bnf.json",
 		"build:docs": "typedoc",
 		"prepublishOnly": "npm run build"
@@ -43,7 +43,7 @@
 		"@types/node": "^24.3.0",
 		"commander": "^14.0.0",
 		"memium": "^0.3.8",
-		"utilium": "^2.4.0"
+		"utilium": "^2.5.1"
 	},
 	"devDependencies": {
 		"@eslint/js": "^9.17.0",

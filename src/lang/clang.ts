@@ -1,4 +1,7 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (c) 2025 James Prevett
 import * as xir from '../ir.js';
+import { createIssueHelpers, emitIssue, Location as IssueLocation } from '../issue.js';
 
 interface _Location {
 	offset: number;
@@ -13,6 +16,26 @@ interface _Location {
 }
 
 export type Location = {} | _Location | { spellingLoc: _Location; expansionLoc: _Location };
+
+/**
+ * Parse a location from Clang's format into our IR's format
+ */
+export function parseLocation(loc: Location): IssueLocation | undefined {
+	if ('expansionLoc' in loc) loc = loc.expansionLoc;
+	if (!('offset' in loc)) return;
+
+	return {
+		line: loc.line,
+		column: loc.col,
+		position: loc.offset,
+		unit: loc.file ?? loc.includedFrom?.file ?? '<unknown>',
+	};
+}
+
+const { error, warning, note, debug } = createIssueHelpers<Node>(node => {
+	if ('loc' in node) return parseLocation(node.loc);
+	else if (node.range) return parseLocation(node.range.begin);
+});
 
 export type ValueCategory = 'prvalue' | 'lvalue' | 'rvalue';
 
@@ -279,6 +302,12 @@ export interface UnaryOperator extends GenericNode {
 	inner: Node[];
 }
 
+export interface RecoveryExpr extends GenericNode {
+	kind: 'RecoveryExpr';
+	inner: Node[];
+	valueCategory: ValueCategory;
+}
+
 export interface Value extends GenericNode {
 	kind:
 		| 'ArraySubscriptExpr'
@@ -321,17 +350,18 @@ export interface DeclRefExpr extends GenericNode {
 export interface Cast extends GenericNode {
 	kind: 'CStyleCastExpr' | 'ImplicitCastExpr';
 	castKind:
-		| 'IntegralCast'
-		| 'LValueToRValue'
-		| 'FunctionToPointerDecay'
-		| 'IntegralToBoolean'
-		| 'IntegralToFloating'
-		| 'NoOp'
 		| 'ArrayToPointerDecay'
 		| 'BitCast'
+		| 'BuiltinFnToFnPtr'
+		| 'Dependent'
+		| 'FunctionToPointerDecay'
+		| 'IntegralCast'
+		| 'IntegralToBoolean'
+		| 'IntegralToFloating'
+		| 'LValueToRValue'
+		| 'NoOp'
 		| 'NullToPointer'
 		| 'PointerToIntegral'
-		| 'BuiltinFnToFnPtr'
 		| 'ToVoid';
 	inner: Node[];
 }
@@ -378,6 +408,7 @@ export type Node =
 	| IfStmt
 	| Label
 	| Member
+	| RecoveryExpr
 	| Statement
 	| Type
 	| UnaryOperator
@@ -485,6 +516,7 @@ export function* parse(node: Node): Generator<xir.Unit> {
 		case 'InitListExpr':
 		case 'ParenExpr':
 		case 'TranslationUnitDecl':
+		case 'RecoveryExpr':
 		case 'StmtExpr':
 			for (const inner of node.inner ?? []) {
 				yield* parse(inner);
@@ -629,11 +661,14 @@ export function* parse(node: Node): Generator<xir.Unit> {
 			return;
 		case 'IfStmt': {
 			const [condition, body, _else] = node.inner!;
+			const elseUnits = node.hasElse ? [...parse(_else)] : undefined;
+			if (elseUnits && !elseUnits.length)
+				warning("Else block is missing body. This could be a bug with Clang's AST.", node);
 			yield {
 				kind: 'if',
 				condition: [...parse(condition)] as xir.Expression[],
 				body: [...parse(body)],
-				else: node.hasElse ? [...parse(_else)] : undefined,
+				else: elseUnits,
 			};
 			return;
 		}
@@ -668,7 +703,7 @@ export function* parse(node: Node): Generator<xir.Unit> {
 			yield { kind: 'comment', text: node.kind.slice(0, -4) };
 			return;
 		case 'ReturnStmt':
-			yield { kind: 'return', value: [...parse(node.inner[0])] as xir.Expression[] };
+			yield { kind: 'return', value: !node.inner ? [] : ([...parse(node.inner[0])] as xir.Expression[]) };
 			return;
 		case 'StaticAssertDecl':
 			yield {

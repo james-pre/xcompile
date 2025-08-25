@@ -1,5 +1,8 @@
-/** A high-level intermediate representation */
-
+// SPDX-License-Identifier: GPL-3.0-or-later
+/**
+ * A high-level intermediate representation used by XCompile.
+ * Copyright (c) 2025 James Prevett
+ */
 import type { TypeName } from 'memium/primitives';
 import { isTypeName as isPrimitive } from 'memium/primitives';
 
@@ -187,6 +190,10 @@ export type Unit =
 	| { kind: 'switch'; expression: Expression[]; body: Unit[] }
 	| { kind: 'type_alias'; name: string; value: Type; exported?: boolean }
 	| ({ kind: 'while'; isDo: boolean } & Conditional);
+
+// XIR is also a target, which is very useful for debugging:
+
+export const textFormat = 0;
 
 function typeText(type: Type): string {
 	switch (type.kind) {
