@@ -254,7 +254,7 @@ export function text(u: Unit): string {
 		case 'ternary':
 			return `${listText(u.condition)} ? ${listText(u.true)} : ${listText(u.false)}`;
 		case 'postfixed': {
-			const primary = listText(u.primary);
+			const primary = listText(u.primary, u.primary.length <= 1);
 			switch (u.post.type) {
 				case 'increment':
 					return primary + '++';

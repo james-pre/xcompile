@@ -74,7 +74,7 @@ function emitValue(value: xir.Value): string {
 
 	if (typeof value.content != 'string') return (value.content as any).toString();
 
-	if (value.content.startsWith('"') && value.content.endsWith('"')) return `$__str(${value.content})`;
+	// if (value.content.startsWith('"') && value.content.endsWith('"')) return `$__str(${value.content})`;
 
 	return value.content;
 }
@@ -121,11 +121,11 @@ export function emit(u: xir.Unit): string {
 			return `${u.operator} ${emitList(u.expression)}`;
 		case 'assignment':
 		case 'binary':
-			return `${emitList(u.left)} ${u.operator} ${emitList(u.right)} `;
+			return `${emitList(u.left, u.left.length == 1)} ${u.operator} ${emitList(u.right, u.right.length == 1)} `;
 		case 'ternary':
-			return `${emitList(u.condition)} ? ${emitList(u.true)} : ${emitList(u.false)}`;
+			return `${emitList(u.condition)} ? ${emitList(u.true, u.true.length <= 1)} : ${emitList(u.false, u.false.length <= 1)}`;
 		case 'postfixed': {
-			const primary = emitList(u.primary);
+			const primary = emitList(u.primary, u.primary.length <= 1);
 			switch (u.post.type) {
 				case 'increment':
 					return primary + '++';

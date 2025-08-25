@@ -48,7 +48,7 @@ export function emit(lang: string, units: xir.Unit[]): string {
 		case 'typescript':
 		case 'ts':
 			return `/* Compiled using XCompile v${$pkg.version} */\n${cToTypescriptHeader} ${units.map(ts.emit).join('')}`;
-		case 'xir-test':
+		case 'xir-text':
 			return `XCompile v${$pkg.version}\nXIR format ${xir.textFormat}\n${units.map(xir.text).join('\n')}`;
 
 		default:

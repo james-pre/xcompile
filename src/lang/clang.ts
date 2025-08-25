@@ -47,6 +47,12 @@ const { error, warning, note, debug } = createIssueHelpers<Node>(function __node
 
 export type ValueCategory = 'prvalue' | 'lvalue' | 'rvalue';
 
+export interface TypeInfo {
+	desugaredQualType?: string;
+	qualType: string;
+	typeAliasDeclId?: string;
+}
+
 export interface GenericNode {
 	/** Hexadecimal ID for the node,	e.g. "0x..." */
 	id: string;
@@ -57,11 +63,7 @@ export interface GenericNode {
 		begin: Location;
 		end: Location;
 	};
-	type: {
-		desugaredQualType?: string;
-		qualType: string;
-		typeAliasDeclId?: string;
-	};
+	type: TypeInfo;
 	inner?: Node[];
 	name?: string;
 }
@@ -333,10 +335,16 @@ export interface Value extends GenericNode {
 		| 'ParenExpr'
 		| 'PredefinedExpr'
 		| 'StmtExpr'
-		| 'StringLiteral'
-		| 'UnaryExprOrTypeTraitExpr';
+		| 'StringLiteral';
 	valueCategory: ValueCategory;
 	value?: string;
+}
+
+export interface UnaryExprOrTypeTraitExpr extends GenericNode {
+	kind: 'UnaryExprOrTypeTraitExpr';
+	valueCategory: ValueCategory;
+	value?: string;
+	argType: TypeInfo;
 }
 
 export interface Member extends GenericNode {
@@ -420,6 +428,7 @@ export type Node =
 	| Statement
 	| Type
 	| UnaryOperator
+	| UnaryExprOrTypeTraitExpr
 	| Value;
 
 function _parseFirst<T extends xir.Unit>(node: Node): T {
@@ -714,7 +723,9 @@ export function* parse(node: Node): Generator<xir.Unit> {
 		case 'ReturnStmt':
 			yield { kind: 'return', value: !node.inner ? [] : ([...parse(node.inner[0])] as xir.Expression[]) };
 			return;
-		case 'StaticAssertDecl':
+		case 'StaticAssertDecl': {
+			const [condition, message] = node.inner ?? [];
+
 			yield {
 				kind: 'postfixed',
 				primary: [
@@ -723,7 +734,7 @@ export function* parse(node: Node): Generator<xir.Unit> {
 						type: {
 							kind: 'function',
 							returns: parseType('void'),
-							args: [parseType('bool'), parseType('string')],
+							args: [parseType(condition), parseType('type' in message ? message : 'string')],
 						},
 						content: '$__assert',
 					},
@@ -736,6 +747,7 @@ export function* parse(node: Node): Generator<xir.Unit> {
 				},
 			};
 			return;
+		}
 		case 'SwitchStmt': {
 			const [_expr, ..._body] = node.inner;
 			yield {
@@ -752,21 +764,29 @@ export function* parse(node: Node): Generator<xir.Unit> {
 			}
 			return;
 		case 'UnaryExprOrTypeTraitExpr': {
-			// In C this is always `sizeof x`
+			// `sizeof(x)` or a macro
 			yield {
 				kind: 'postfixed',
 				primary: [
 					{
 						kind: 'value',
-						type: { kind: 'function', returns: parseType('uint64'), args: [parseType('any')] },
+						type: { kind: 'function', returns: parseType(node), args: [parseType(node.argType.qualType)] },
 						content: node.name!,
 					},
 				],
 				post: {
 					type: 'call',
 					args:
-						node.inner?.flatMap(node => [...parse(node)] as xir.Expression[]) ??
-						(warning('Empty unary or type trait expression', node), []),
+						node.name == 'sizeof'
+							? [
+									{
+										kind: 'value',
+										type: { kind: 'plain', text: 'string' },
+										content: JSON.stringify(parseBaseType(node.argType.qualType)),
+									},
+								]
+							: (node.inner?.flatMap(node => [...parse(node)] as xir.Expression[]) ??
+								(warning('Empty unary or type trait expression', node), [])),
 				},
 			};
 			return;
