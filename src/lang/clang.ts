@@ -438,6 +438,7 @@ export type Node =
 
 interface InterruptLike {
 	$interrupt: true;
+	$depth: number;
 	kind: string;
 	node?: Node;
 }
@@ -457,6 +458,7 @@ function interrupt<T extends Interrupt>(init: Omit<T, `$${string}`>): never {
 	throw {
 		...init,
 		$interrupt: true,
+		$depth: 0,
 	} satisfies Interrupt;
 }
 
@@ -861,7 +863,11 @@ export function parse<T extends xir.Unit>(node: Node, opt: ParseInternalOptions 
 		for (const unit of parseRaw(node)) result.push(unit as T);
 		return result;
 	} catch (int) {
-		if (!isInterrupt(int) || opt.cascade) throw int;
+		if (!isInterrupt(int)) throw int;
+		if (opt.cascade && !process.argv.includes('--debug-no-cascade')) {
+			int.$depth++;
+			throw int;
+		}
 		switch (int.kind) {
 			case 'invalid_recovery':
 				warning('Recovered from invalid expression', int.node);

@@ -5,7 +5,8 @@ import { program } from 'commander';
 import { writeFileSync } from 'node:fs';
 import { parseArgs, styleText } from 'node:util';
 import $pkg from '../package.json' with { type: 'json' };
-import { emit, IssueLevel, onIssue, parse, stringifyIssue, xir } from './index.js';
+import type { xir } from './index.js';
+import { emit, IssueLevel, onIssue, parse, stringifyIssue } from './index.js';
 
 // @todo implement CLI using commander.
 program
