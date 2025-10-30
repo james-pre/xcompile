@@ -17,10 +17,10 @@ jobs:
             id-token: write
         steps:
             - name: Checkout
-              uses: actions/checkout@v4
+              uses: actions/checkout@v5
 
             - name: Setup npm authentication
-              uses: actions/setup-node@v4
+              uses: actions/setup-node@v6
               with:
                   node-version: latest
                   registry-url: https://registry.npmjs.org/
@@ -45,12 +45,12 @@ jobs:
             url: ${{ steps.deploy.outputs.page_url }}
         steps:
             - name: Checkout
-              uses: actions/checkout@v4
+              uses: actions/checkout@v5
 
             - name: Set up Node.js
-              uses: actions/setup-node@v4
+              uses: actions/setup-node@v6
               with:
-                  node-version: 22
+                  node-version: latest
 
             - name: Install dependencies
               run: npm install
@@ -59,7 +59,7 @@ jobs:
               run: npm run build:docs
 
             - name: Upload docs artifact
-              uses: actions/upload-pages-artifact@v3
+              uses: actions/upload-pages-artifact@v4
               with:
                   path: ./docs
 
