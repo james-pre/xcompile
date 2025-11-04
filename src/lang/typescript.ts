@@ -155,7 +155,9 @@ export function emit(u: xir.Unit): string {
 			}
 		}
 		case 'cast':
-			return `(${emit(u.value)} as ${emitType(u.type)})`;
+			return u.value
+				? `(${emit(u.value)} as ${emitType(u.type)})`
+				: `/* <missing value> as ${emitType(u.type)} */`;
 		case 'struct':
 		case 'class':
 		case 'union': {
