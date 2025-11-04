@@ -33,7 +33,7 @@ export function baseType(type: Type): string {
 export type TypeQualifier = string;
 
 export type Type =
-	| { kind: 'plain'; text: string; raw?: Type }
+	| { kind: 'plain'; text: string; raw?: Type; attributes?: string[] }
 	| { kind: 'array'; length: number | null; element: Type }
 	| { kind: 'ref'; to: Type; restricted?: boolean }
 	| { kind: 'function'; returns: Type; args: Type[] }
@@ -234,7 +234,7 @@ export function text(u: Unit): string {
 		case 'return':
 			return 'return ' + listText(u.value);
 		case 'if':
-			return `if ${listText(u.condition)}\n${blockText(u.body)} ${!u.else ? '' : '\nelse ' + (u.else[0].kind == 'if' ? blockText(u.else) : blockText(u.else))}`;
+			return `if ${listText(u.condition)}\n${blockText(u.body)} ${!u.else ? '' : '\nelse ' + (!u.else[0] ? '<missing>' : u.else[0].kind == 'if' ? blockText(u.else) : blockText(u.else))}`;
 		case 'while':
 			return u.isDo
 				? `do ${blockText(u.body)} while ${listText(u.condition)}`
@@ -280,7 +280,7 @@ export function text(u: Unit): string {
 			}
 		}
 		case 'cast':
-			return `(cast ${text(u.value)} to ${typeText(u.type)})`;
+			return `(cast ${u.value ? text(u.value) : '???'} to ${typeText(u.type)})`;
 		case 'struct':
 		case 'class':
 		case 'union':

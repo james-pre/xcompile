@@ -43,14 +43,21 @@ export function parse(lang: string, file: string, opts: ParseOptions): Iterable<
 	}
 }
 
-export function emit(lang: string, units: xir.Unit[]): string {
+export interface EmitOptions {
+	/** Type casts currently are very prone to being emitted as invalid code */
+	noCasts?: boolean;
+}
+
+export function emit(lang: string, units: xir.Unit[], opts: EmitOptions): string {
 	switch (lang) {
 		case 'typescript':
 		case 'ts':
+			if (opts.noCasts) ts._disableCasts();
 			return `/* Compiled using XCompile v${$pkg.version} */\n${cToTypescriptHeader} ${units.map(ts.emit).join('')}`;
 		case 'xir-text':
 			return `XCompile v${$pkg.version}\nXIR format ${xir.textFormat}\n${units.map(xir.text).join('\n')}`;
-
+		case 'xir-json':
+			return JSON.stringify(units, null, 4).replaceAll(/^( {4})+/gim, match => '\t'.repeat(match.length / 4));
 		default:
 			throw new Error('Unsupported target language: ' + lang);
 	}

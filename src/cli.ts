@@ -28,6 +28,7 @@ const {
 		'ignore-exit': { short: 'k', type: 'boolean' },
 		'allow-dupe': { type: 'boolean' },
 		'issue-entry': { type: 'string' },
+		'emit-no-casts': { type: 'boolean' },
 	},
 	allowPositionals: true,
 });
@@ -45,6 +46,7 @@ Sources:
 Targets:
 	ts, typescript       TypeScript
 	xir-text             A textual representation of the XCompile IR
+	xir-json			 The raw JSON of the XCompile IR
 
 Options:
 	-h, --help           Display this help message
@@ -53,7 +55,8 @@ Options:
 	-o, --output <path>  Write output to path
 	-k, --ignore-exit    Ignore the exit code of sub-shells
 	    --allow-dupe     Report duplicate issues
-	    --issue-entry    Set the entry point used when computing issue messages`);
+	    --issue-entry    Set the entry point used when computing issue messages
+        --emit-no-casts  Type casts will not be emitted`);
 	process.exit(1);
 }
 
@@ -81,7 +84,7 @@ try {
 
 let content: string;
 try {
-	content = emit(target, [...ir]);
+	content = emit(target, [...ir], { noCasts: opt['emit-no-casts'] });
 } catch (err: any) {
 	console.error(styleText('red', err instanceof Error ? err.stack : err.toString()));
 	process.exit(1);

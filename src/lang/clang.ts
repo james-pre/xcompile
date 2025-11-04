@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (c) 2025 James Prevett
-import { omit } from 'utilium';
 import * as xir from '../ir.js';
 import { __entry, createIssueHelpers, getSource } from '../issue.js';
 
@@ -188,18 +187,19 @@ const _type_array = /(.*)\[(\d*)\]$/;
 const _type_pointer = /(.*)\s*\*(?:restrict)?$/;
 const _type_qualified = /^(const|volatile)(\W+.*)|(.*\W+)(const|volatile)$/;
 const _type_typeof = /^typeof\s*\((.*)\)$/;
+const _type_attribute = /^(.*)__attribute__\s*\(\((.*)\)\)(.*)$/;
 
-function parseType(type: string | Node, raw?: string, alt?: string, _isRaw: boolean = false): xir.Type {
-	if (!type) return { kind: 'plain', text: 'unknown' };
+function parseType(node: Node, type: Node | string, raw?: string, alt?: string, _isRaw: boolean = false): xir.Type {
+	if (!type) return { kind: 'plain', text: 'any' };
 
 	if (typeof type != 'string') {
-		const _ = type.type ?? {};
+		const _ = node.type ?? {};
 
-		if (type.kind == 'ElaboratedType' && type.ownedTagDecl && !type.ownedTagDecl.name) {
-			return { kind: 'plain', text: '_' + type.ownedTagDecl.id, raw: parseType(type.type.qualType) };
+		if (node.kind == 'ElaboratedType' && node.ownedTagDecl && !node.ownedTagDecl.name) {
+			return { kind: 'plain', text: '_' + node.ownedTagDecl.id, raw: parseType(node, node.type.qualType) };
 		}
 
-		return parseType(_.qualType, _.desugaredQualType, _.qualType);
+		return parseType(node, _.qualType, _.desugaredQualType, _.qualType);
 	}
 
 	type = type.trim();
@@ -211,36 +211,51 @@ function parseType(type: string | Node, raw?: string, alt?: string, _isRaw: bool
 	type = type.trim();
 
 	const [isPtr, to] = type.match(_type_pointer) ?? [];
-	if (isPtr) return { kind: 'ref', restricted: type.includes('*restrict'), to: parseType(to) };
+	if (isPtr) return { kind: 'ref', restricted: type.includes('*restrict'), to: parseType(node, to) };
 
 	const [isFnPtr, fn_ptr_returns, fn_ptr_args] = type.match(_type_function_pointer) ?? [];
 	if (isFnPtr) {
-		const args = fn_ptr_args.split(',').map(v => parseType(v.trim()));
-		return { kind: 'function', returns: parseType(fn_ptr_returns), args };
+		const args = fn_ptr_args.split(',').map(v => parseType(node, v.trim()));
+		return { kind: 'function', returns: parseType(node, fn_ptr_returns), args };
 	}
 
 	const [isFn, fn_returns, fn_args] = type.match(_type_function) ?? [];
 	if (isFn) {
-		const args = fn_args.split(',').map(v => parseType(v.trim()));
-		return { kind: 'function', returns: parseType(fn_returns), args };
+		const args = fn_args.split(',').map(v => parseType(node, v.trim()));
+		return { kind: 'function', returns: parseType(node, fn_returns), args };
 	}
 
 	const [isTypeOf, typeofTarget] = type.match(_type_typeof) ?? [];
-	if (isTypeOf) return { kind: 'typeof', target: parseType(typeofTarget.trim()) };
+	if (isTypeOf) return { kind: 'typeof', target: parseType(node, typeofTarget.trim()) };
 
 	const [isNs, namespace, inner] = type.match(_type_namespace) ?? [];
-	if (isNs) return { kind: 'namespaced', namespace, inner: parseType(inner.trim()) };
+	if (isNs) return { kind: 'namespaced', namespace, inner: parseType(node, inner.trim()) };
 
 	const [isQualified, leftQualifier, leftInner, rightInner, rightQualifier] = type.match(_type_qualified) ?? [];
 	if (isQualified) {
 		const [qualifier, inner] = leftQualifier ? [leftQualifier, leftInner] : [rightQualifier, rightInner];
-		return { kind: 'qual', qualifier, inner: parseType(inner.trim()) };
+		return { kind: 'qual', qualifier, inner: parseType(node, inner.trim()) };
 	}
 
 	const [isArray, element, length] = type.match(_type_array) ?? [];
-	if (isArray) return { kind: 'array', length: length ? +length : null, element: parseType(element) };
+	if (isArray) return { kind: 'array', length: length ? +length : null, element: parseType(node, element) };
 
-	return { kind: 'plain', text: parseBaseType(type), raw: _isRaw ? undefined : parseType(raw, raw, alt, true) };
+	let attributes: string[] | undefined;
+
+	const [hasAttribute, beforeAttr, attr, afterAttr] = type.match(_type_attribute) ?? [];
+	if (hasAttribute) {
+		if (beforeAttr && afterAttr) warning('Unexpected content before and after __attribute__', node);
+
+		type = beforeAttr?.trim() || afterAttr?.trim();
+		attributes = attr.split(',').map(a => a.trim());
+	}
+
+	return {
+		kind: 'plain',
+		text: parseBaseType(type),
+		raw: _isRaw ? undefined : parseType(node, raw, raw, alt, true),
+		attributes,
+	};
 }
 
 export type StorageClass = 'extern' | 'static';
@@ -553,7 +568,7 @@ function* parseRaw(node: Node): Generator<xir.Unit> {
 		}
 		case 'ConstantExpr':
 			if (node.value) {
-				yield { kind: 'value', type: parseType(node), content: node.value };
+				yield { kind: 'value', type: parseType(node, node), content: node.value };
 				return;
 			}
 		// fallthrough
@@ -580,7 +595,7 @@ function* parseRaw(node: Node): Generator<xir.Unit> {
 			return;
 		}
 		case 'CStyleCastExpr':
-			yield { kind: 'cast', type: parseType(node), value: _parseFirst(node) };
+			yield { kind: 'cast', type: parseType(node, node), value: _parseFirst(node) };
 			return;
 		case 'DefaultStmt':
 			yield { kind: 'default' };
@@ -614,7 +629,7 @@ function* parseRaw(node: Node): Generator<xir.Unit> {
 			yield {
 				kind: 'declaration',
 				name: node.name,
-				type: parseType(node),
+				type: parseType(node, node),
 				storage: node.storageClass,
 				initializer: node.inner?.length ? _parseFirst<xir.Value>(node) : undefined,
 			};
@@ -649,7 +664,7 @@ function* parseRaw(node: Node): Generator<xir.Unit> {
 			yield {
 				kind: 'enum_field',
 				name: node.name,
-				type: parseType(node),
+				type: parseType(node, node),
 				value: node.inner?.length ? _parseFirst<xir.Value>(node) : undefined,
 			};
 			return;
@@ -659,7 +674,7 @@ function* parseRaw(node: Node): Generator<xir.Unit> {
 			yield {
 				kind: node.kind == 'ParmVarDecl' ? 'parameter' : 'field',
 				name: node.name,
-				type: parseType(node),
+				type: parseType(node, node),
 				storage: node.storageClass,
 			};
 			return;
@@ -667,7 +682,7 @@ function* parseRaw(node: Node): Generator<xir.Unit> {
 		case 'FloatingLiteral':
 		case 'IntegerLiteral':
 		case 'StringLiteral':
-			yield { kind: 'value', type: parseType(node), content: node.value! };
+			yield { kind: 'value', type: parseType(node, node), content: node.value! };
 			return;
 		case 'ForStmt': {
 			const [_init, , _cond, _action, ..._body] = node.inner;
@@ -688,7 +703,7 @@ function* parseRaw(node: Node): Generator<xir.Unit> {
 			yield {
 				kind: 'function',
 				name: node.name,
-				returns: parseType(return_t),
+				returns: parseType(node, return_t),
 				exported: node.name == 'main',
 				parameters:
 					node.inner
@@ -696,7 +711,7 @@ function* parseRaw(node: Node): Generator<xir.Unit> {
 						.map((param, i) => ({
 							kind: 'parameter',
 							name: param.name ?? '__' + i,
-							type: parseType(param),
+							type: parseType(param, param),
 						})) ?? [],
 				body: body ? parse(body) : [],
 				storage: node.storageClass,
@@ -734,7 +749,7 @@ function* parseRaw(node: Node): Generator<xir.Unit> {
 			yield {
 				kind: 'value',
 				content: node.referencedDecl.name,
-				type: parseType(node.referencedDecl),
+				type: parseType(node, node.referencedDecl),
 			};
 			return;
 		case 'MemberExpr':
@@ -763,8 +778,11 @@ function* parseRaw(node: Node): Generator<xir.Unit> {
 						kind: 'value',
 						type: {
 							kind: 'function',
-							returns: parseType('void'),
-							args: [parseType(condition), parseType('type' in message ? message : 'string')],
+							returns: parseType(node, 'void'),
+							args: [
+								parseType(node, condition),
+								'type' in message ? parseType(node, message) : parseType(node, 'string'),
+							],
 						},
 						content: '$__assert',
 					},
@@ -790,7 +808,7 @@ function* parseRaw(node: Node): Generator<xir.Unit> {
 		case 'TypedefDecl':
 			if (!node.isReferenced) return;
 			if (!['__builtin_ms_va_list', '__builtin_va_list', '__NSConstantString'].includes(node.name)) {
-				yield { kind: 'type_alias', name: node.name, value: parseType(node.inner![0]) };
+				yield { kind: 'type_alias', name: node.name, value: parseType(node.inner![0], node.inner![0]) };
 			}
 			return;
 		case 'UnaryExprOrTypeTraitExpr': {
@@ -803,8 +821,8 @@ function* parseRaw(node: Node): Generator<xir.Unit> {
 						kind: 'value',
 						type: {
 							kind: 'function',
-							returns: parseType(node),
-							args: node.argType ? [parseType(node.argType.qualType)] : [],
+							returns: parseType(node, node),
+							args: node.argType ? [parseType(node, node.argType.qualType)] : [],
 						},
 						content: node.name!,
 					},

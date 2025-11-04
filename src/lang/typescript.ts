@@ -3,6 +3,15 @@
 import * as xir from '../ir.js';
 import { isTypeName } from 'memium/primitives';
 
+/**
+ * @todo Don't use global state
+ */
+let _emitCasts = true;
+
+export function _disableCasts() {
+	_emitCasts = false;
+}
+
 function _baseType(typename: string): string {
 	return typename.replaceAll(' ', '_');
 }
@@ -31,7 +40,7 @@ function emitType(type: xir.Type, namespace?: string): string {
 }
 
 function emitBlock(block: xir.Unit[], noSemi: boolean = false): string {
-	return `{\n${block.map(emit).join((noSemi ? '' : ';') + '\n')}\n}\n`;
+	return `{\n${block.map(u => '\t' + emit(u)).join((noSemi ? '' : ';') + '\n')}\n}\n`;
 }
 
 function emitList(expr: xir.Unit[], noParans: boolean = false): string {
@@ -50,7 +59,7 @@ function emitParameters(params: xir.Declaration[]): string {
 
 /** Emit runtime Memium field type */
 function emitFieldType(type: xir.Type | null): string {
-	if (!type) return 'Void /* no type */';
+	if (!type) return 'Void /* missing type */';
 	if (type.kind == 'plain' && type.raw) type = type.raw;
 	switch (type.kind) {
 		case 'plain':
@@ -155,9 +164,11 @@ export function emit(u: xir.Unit): string {
 			}
 		}
 		case 'cast':
-			return u.value
-				? `(${emit(u.value)} as ${emitType(u.type)})`
-				: `/* <missing value> as ${emitType(u.type)} */`;
+			return !_emitCasts
+				? ''
+				: u.value
+					? `(${emit(u.value)} as ${emitType(u.type)})`
+					: `/* <missing value> as ${emitType(u.type)} */`;
 		case 'struct':
 		case 'class':
 		case 'union': {

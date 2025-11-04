@@ -4,3 +4,10 @@ dist
 tmp
 docs
 *.log
+.*
+!.vscode
+!.gitignore
+!.github
+!.gitattributes
+!.editorconfig
+!.prettierrc
