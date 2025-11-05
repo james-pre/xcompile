@@ -179,7 +179,7 @@ function parseBaseType(type: string): string {
 	return type;
 }
 
-const _type_anonymous = /(?:unnamed(?: \w+)?|anonymous) at /;
+const _type_anonymous = /^(.*)\s+\((?:unnamed(?: \w+)?|anonymous) at (.*)\)$/;
 const _type_namespace = /^(struct|union|enum) (.*)/;
 const _type_function = /^([^(]+)\s+\((.*)\)/;
 const _type_function_pointer = /([^(]+)\s+\(\*\)\s*\((.*)\)/;
@@ -189,62 +189,90 @@ const _type_qualified = /^(const|volatile)(\W+.*)|(.*\W+)(const|volatile)$/;
 const _type_typeof = /^typeof\s*\((.*)\)$/;
 const _type_attribute = /^(.*)__attribute__\s*\(\((.*)\)\)(.*)$/;
 
-function parseType(node: Node, type: Node | string, raw?: string, alt?: string, _isRaw: boolean = false): xir.Type {
+interface ParseTypeContext {
+	node: Node;
+	/** Desugared type */
+	raw?: string | null;
+	/** Alternative type for anonymous types */
+	anon_alt?: string | null;
+	/** Whether we are now parsing the raw type */
+	isRaw?: boolean;
+
+	stack: string[];
+}
+
+function _parseType($: ParseTypeContext, type: string | null): xir.Type {
 	if (!type) return { kind: 'plain', text: 'any' };
 
-	if (typeof type != 'string') {
-		const _ = node.type ?? {};
-
-		if (node.kind == 'ElaboratedType' && node.ownedTagDecl && !node.ownedTagDecl.name) {
-			return { kind: 'plain', text: '_' + node.ownedTagDecl.id, raw: parseType(node, node.type.qualType) };
-		}
-
-		return parseType(node, _.qualType, _.desugaredQualType, _.qualType);
+	if ($.stack.includes(type)) {
+		let info = !process.env.DEBUG_TYPE_STACK
+			? type
+			: $.stack
+					.toReversed()
+					.map(t => '\n    ' + t)
+					.join('');
+		if (process.env.DEBUG_TYPE_STACK)
+			info += `\nanon_alt=${JSON.stringify($.anon_alt)}\nraw=${JSON.stringify($.raw)}\nCall stack:\n${new Error().stack?.slice(6)}`;
+		throw error('BUG! Infinite loop while parsing type: ' + info, $.node);
 	}
 
-	type = type.trim();
-	raw ??= type;
-
-	const match = type.match(_type_anonymous);
-	if (match) type = alt ?? '';
+	$ = { ...$, stack: [...$.stack, type] };
 
 	type = type.trim();
+
+	const [isAnonymous, anonType, anonLocation] = type.match(_type_anonymous) ?? [];
+	if (isAnonymous) {
+		if ($.anon_alt) {
+			$.anon_alt = null;
+			return _parseType($, $.anon_alt);
+		} else {
+			warning(`Unable to resolve anonymous type: ${isAnonymous}`, $.node);
+			return { kind: 'plain', text: 'any' };
+		}
+	}
+
+	const [isTypeOf, typeofTarget] = type.match(_type_typeof) ?? [];
+	if (isTypeOf) {
+		if ($.raw) return _parseType({ ...$, isRaw: true, raw: null }, $.raw);
+		try {
+			return { kind: 'typeof', target: _parseType($, typeofTarget.trim()) };
+		} catch (e) {
+			warning('Unable to parse type: ' + isTypeOf, $.node);
+			return { kind: 'plain', text: 'any' };
+		}
+	}
 
 	const [isPtr, to] = type.match(_type_pointer) ?? [];
-	if (isPtr) return { kind: 'ref', restricted: type.includes('*restrict'), to: parseType(node, to) };
+	if (isPtr) return { kind: 'ref', restricted: type.includes('*restrict'), to: _parseType($, to) };
 
 	const [isFnPtr, fn_ptr_returns, fn_ptr_args] = type.match(_type_function_pointer) ?? [];
 	if (isFnPtr) {
-		const args = fn_ptr_args.split(',').map(v => parseType(node, v.trim()));
-		return { kind: 'function', returns: parseType(node, fn_ptr_returns), args };
+		const args = fn_ptr_args.split(',').map(v => _parseType($, v.trim()));
+		return { kind: 'function', returns: _parseType($, fn_ptr_returns), args };
 	}
 
 	const [isFn, fn_returns, fn_args] = type.match(_type_function) ?? [];
 	if (isFn) {
-		const args = fn_args.split(',').map(v => parseType(node, v.trim()));
-		return { kind: 'function', returns: parseType(node, fn_returns), args };
+		const args = fn_args.split(',').map(v => _parseType($, v.trim()));
+		return { kind: 'function', returns: _parseType($, fn_returns), args };
 	}
 
-	const [isTypeOf, typeofTarget] = type.match(_type_typeof) ?? [];
-	if (isTypeOf) return { kind: 'typeof', target: parseType(node, typeofTarget.trim()) };
-
 	const [isNs, namespace, inner] = type.match(_type_namespace) ?? [];
-	if (isNs) return { kind: 'namespaced', namespace, inner: parseType(node, inner.trim()) };
+	if (isNs) return { kind: 'namespaced', namespace, inner: _parseType($, inner.trim()) };
 
 	const [isQualified, leftQualifier, leftInner, rightInner, rightQualifier] = type.match(_type_qualified) ?? [];
 	if (isQualified) {
 		const [qualifier, inner] = leftQualifier ? [leftQualifier, leftInner] : [rightQualifier, rightInner];
-		return { kind: 'qual', qualifier, inner: parseType(node, inner.trim()) };
+		return { kind: 'qual', qualifier, inner: _parseType($, inner.trim()) };
 	}
 
 	const [isArray, element, length] = type.match(_type_array) ?? [];
-	if (isArray) return { kind: 'array', length: length ? +length : null, element: parseType(node, element) };
-
+	if (isArray) return { kind: 'array', length: length ? +length : null, element: _parseType($, element) };
 	let attributes: string[] | undefined;
 
 	const [hasAttribute, beforeAttr, attr, afterAttr] = type.match(_type_attribute) ?? [];
 	if (hasAttribute) {
-		if (beforeAttr && afterAttr) warning('Unexpected content before and after __attribute__', node);
+		if (beforeAttr && afterAttr) warning('Unexpected content before and after __attribute__', $.node);
 
 		type = beforeAttr?.trim() || afterAttr?.trim();
 		attributes = attr.split(',').map(a => a.trim());
@@ -253,9 +281,37 @@ function parseType(node: Node, type: Node | string, raw?: string, alt?: string, 
 	return {
 		kind: 'plain',
 		text: parseBaseType(type),
-		raw: _isRaw ? undefined : parseType(node, raw, raw, alt, true),
+		raw: $.isRaw || !$.raw ? undefined : _parseType({ ...$, isRaw: true }, $.raw),
 		attributes,
 	};
+}
+
+function parseType(node: Node, type: Node | string): xir.Type {
+	if (typeof type != 'string') {
+		const _ = node.type ?? {};
+
+		if (node.kind == 'ElaboratedType' && node.ownedTagDecl && !node.ownedTagDecl.name) {
+			return { kind: 'plain', text: '_' + node.ownedTagDecl.id, raw: parseType(node, node.type.qualType) };
+		}
+
+		const isRaw = !!(_type_typeof.test(_.qualType) && _.desugaredQualType);
+
+		return _parseType(
+			{
+				node,
+				anon_alt:
+					_.desugaredQualType && _type_anonymous.test(_.desugaredQualType) ? _.desugaredQualType : undefined,
+				isRaw,
+				stack: [],
+				raw: isRaw ? null : _.desugaredQualType,
+			},
+			isRaw ? _.desugaredQualType! : _.qualType
+		);
+	}
+
+	type = type.trim();
+
+	return _parseType({ node, stack: [] }, type);
 }
 
 export type StorageClass = 'extern' | 'static';
@@ -481,6 +537,8 @@ function _parseFirst<T extends xir.Unit>(node: Node): T {
 	return parse<T>(node.inner![0])[0];
 }
 
+const unnamedRecord = new Map<string, xir.RecordLike>();
+
 function* parseRaw(node: Node): Generator<xir.Unit> {
 	switch (node.kind) {
 		case 'BuiltinType':
@@ -639,7 +697,7 @@ function* parseRaw(node: Node): Generator<xir.Unit> {
 			const subRecords: xir.RecordLike[] = [];
 			let lastSubRecord: number | undefined;
 
-			yield {
+			const u = {
 				kind: node.kind == 'EnumDecl' ? 'enum' : node.tagUsed!,
 				name: node.name ?? '_' + node.id,
 				subRecords,
@@ -657,7 +715,11 @@ function* parseRaw(node: Node): Generator<xir.Unit> {
 						return [];
 					})
 					.map((u, index) => ({ ...u, index })) as xir.Declaration[],
-			};
+			} as const;
+
+			if (!node.name) unnamedRecord.set(node.id, u);
+
+			yield u;
 			return;
 		}
 		case 'EnumConstantDecl':
@@ -805,12 +867,20 @@ function* parseRaw(node: Node): Generator<xir.Unit> {
 			};
 			return;
 		}
-		case 'TypedefDecl':
+		case 'TypedefDecl': {
 			if (!node.isReferenced) return;
-			if (!['__builtin_ms_va_list', '__builtin_va_list', '__NSConstantString'].includes(node.name)) {
-				yield { kind: 'type_alias', name: node.name, value: parseType(node.inner![0], node.inner![0]) };
+			if (['__builtin_ms_va_list', '__builtin_va_list', '__NSConstantString'].includes(node.name)) return;
+			const [elaborated] = node.inner! as [ElaboratedType];
+			if (elaborated.ownedTagDecl) {
+				const record = unnamedRecord.get(elaborated.ownedTagDecl.id);
+				if (record && record.name == '_' + elaborated.ownedTagDecl.id) {
+					record.name = node.name;
+					return;
+				}
 			}
+			yield { kind: 'type_alias', name: node.name, value: parseType(elaborated, elaborated) };
 			return;
+		}
 		case 'UnaryExprOrTypeTraitExpr': {
 			// `sizeof(x)` or a macro
 
