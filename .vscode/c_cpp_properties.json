@@ -1,0 +1,17 @@
+{
+	"configurations": [
+		{
+			"name": "Linux",
+			"includePath": [
+				"${default}",
+				"${workspaceFolder}/node_modules/node-api-headers/include",
+				"${workspaceFolder}/node_modules/node-addon-api"
+			],
+			"defines": [],
+			"cStandard": "c17",
+			"cppStandard": "c++17",
+			"intelliSenseMode": "linux-clang-x64"
+		}
+	],
+	"version": 4
+}
