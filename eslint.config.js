@@ -1,7 +1,8 @@
 import tseslint from 'typescript-eslint';
 import eslint from '@eslint/js';
+import { defineConfig } from 'eslint/config';
 
-export default tseslint.config({
+export default defineConfig({
 	name: 'XCompile',
 	extends: [eslint.configs.recommended, ...tseslint.configs.recommendedTypeChecked],
 	files: ['src/**/*.ts'],
@@ -16,13 +17,14 @@ export default tseslint.config({
 	rules: {
 		'no-useless-escape': 'warn',
 		'no-unreachable': 'warn',
-		'no-fallthrough': 'warn',
+		'no-fallthrough': 'off',
 		'no-empty': 'warn',
 		'no-case-declarations': 'warn',
 		'prefer-const': 'warn',
 		'prefer-rest-params': 'warn',
 		'prefer-spread': 'warn',
 		'no-unused-vars': 'off',
+		'@typescript-eslint/no-fallthrough': 'warn',
 		'@typescript-eslint/no-unused-vars': 'warn',
 		'@typescript-eslint/no-inferrable-types': 'off',
 		'@typescript-eslint/no-this-alias': 'off',
