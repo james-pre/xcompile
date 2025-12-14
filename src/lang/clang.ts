@@ -179,7 +179,7 @@ function parseBaseType(type: string): string {
 	return type;
 }
 
-const _type_anonymous = /^(.*)\s+\((?:unnamed(?: \w+)?|anonymous) at (.*)\)$/;
+const _type_anonymous = /^(.*)\((?:unnamed(?: \w+)?|anonymous) at (.*)\)$/;
 const _type_namespace = /^(struct|union|enum) (.*)/;
 const _type_function = /^([^(]+)\s+\((.*)\)/;
 const _type_function_pointer = /([^(]+)\s+\(\*\)\s*\((.*)\)/;
@@ -199,6 +199,8 @@ interface ParseTypeContext {
 	isRaw?: boolean;
 
 	stack: string[];
+
+	attributes?: string[];
 }
 
 function _parseType($: ParseTypeContext, type: string | null): xir.Type {
@@ -268,21 +270,21 @@ function _parseType($: ParseTypeContext, type: string | null): xir.Type {
 
 	const [isArray, element, length] = type.match(_type_array) ?? [];
 	if (isArray) return { kind: 'array', length: length ? +length : null, element: _parseType($, element) };
-	let attributes: string[] | undefined;
 
 	const [hasAttribute, beforeAttr, attr, afterAttr] = type.match(_type_attribute) ?? [];
 	if (hasAttribute) {
 		if (beforeAttr && afterAttr) warning('Unexpected content before and after __attribute__', $.node);
 
 		type = beforeAttr?.trim() || afterAttr?.trim();
-		attributes = attr.split(',').map(a => a.trim());
+		$.attributes = attr.split(',').map(a => a.trim());
+		return _parseType($, type);
 	}
 
 	return {
 		kind: 'plain',
 		text: parseBaseType(type),
 		raw: $.isRaw || !$.raw ? undefined : _parseType({ ...$, isRaw: true }, $.raw),
-		attributes,
+		attributes: $.attributes,
 	};
 }
 
@@ -314,7 +316,7 @@ function parseType(node: Node, type: Node | string): xir.Type {
 	return _parseType({ node, stack: [] }, type);
 }
 
-export type StorageClass = 'extern' | 'static';
+export type StorageClass = 'extern' | 'static' | 'register';
 
 export interface Declaration extends GenericNode {
 	kind:
@@ -423,6 +425,19 @@ export interface UnaryExprOrTypeTraitExpr extends GenericNode {
 	argType?: TypeInfo;
 }
 
+export interface TypeTraitExpr extends GenericNode {
+	kind: 'TypeTraitExpr';
+	valueCategory: ValueCategory;
+	type: TypeInfo;
+	inner: Node[];
+}
+
+export interface TypeOfExprType extends GenericNode {
+	kind: 'TypeOfExprType';
+	type: TypeInfo;
+	inner: Node[];
+}
+
 export interface Member extends GenericNode {
 	kind: 'MemberExpr';
 	valueCategory: ValueCategory;
@@ -437,6 +452,7 @@ export interface DeclRefExpr extends GenericNode {
 	valueCategory: ValueCategory;
 	referencedDecl: Declaration;
 	inner: Node[];
+	nonOdrUseReason?: 'none' | 'unevaluated' | 'constant' | 'discarded';
 }
 
 export interface Cast extends GenericNode {
@@ -503,6 +519,8 @@ export type Node =
 	| RecoveryExpr
 	| Statement
 	| Type
+	| TypeOfExprType
+	| TypeTraitExpr
 	| UnaryOperator
 	| UnaryExprOrTypeTraitExpr
 	| Value;
@@ -688,8 +706,17 @@ function* parseRaw(node: Node): Generator<xir.Unit> {
 				kind: 'declaration',
 				name: node.name,
 				type: parseType(node, node),
-				storage: node.storageClass,
-				initializer: node.inner?.length ? _parseFirst<xir.Value>(node) : undefined,
+				storage: node.storageClass != 'register' ? node.storageClass : undefined,
+				initializer:
+					node.storageClass == 'register'
+						? {
+								kind: 'value',
+								type: parseType(node, 'uint64'),
+								content: '$__register__' + node.mangledName!,
+							}
+						: node.inner?.length
+							? _parseFirst<xir.Value>(node)
+							: undefined,
 			};
 			return;
 		case 'EnumDecl':
@@ -737,7 +764,7 @@ function* parseRaw(node: Node): Generator<xir.Unit> {
 				kind: node.kind == 'ParmVarDecl' ? 'parameter' : 'field',
 				name: node.name,
 				type: parseType(node, node),
-				storage: node.storageClass,
+				storage: node.storageClass == 'register' ? undefined : node.storageClass,
 			};
 			return;
 		case 'CharacterLiteral':
@@ -776,7 +803,7 @@ function* parseRaw(node: Node): Generator<xir.Unit> {
 							type: parseType(param, param),
 						})) ?? [],
 				body: body ? parse(body) : [],
-				storage: node.storageClass,
+				storage: node.storageClass == 'register' ? undefined : node.storageClass,
 			};
 			return;
 		}
@@ -815,6 +842,11 @@ function* parseRaw(node: Node): Generator<xir.Unit> {
 			};
 			return;
 		case 'MemberExpr':
+			if (!node.name) {
+				/** Clang's AST will emit a member access with an empty name when accessing things like anonymous unions */
+				yield* parse(node.inner[0]);
+				return;
+			}
 			yield {
 				kind: 'postfixed',
 				primary: parse(node.inner[0]),
@@ -881,6 +913,12 @@ function* parseRaw(node: Node): Generator<xir.Unit> {
 			yield { kind: 'type_alias', name: node.name, value: parseType(elaborated, elaborated) };
 			return;
 		}
+		case 'TypeOfExprType': {
+			return;
+		}
+		case 'TypeTraitExpr': {
+			return;
+		}
 		case 'UnaryExprOrTypeTraitExpr': {
 			// `sizeof(x)` or a macro
 
@@ -933,6 +971,10 @@ function* parseRaw(node: Node): Generator<xir.Unit> {
 				body: parse(_body),
 			};
 			return;
+		}
+		default: {
+			// @ts-expect-error 2339 — should be never since all kinds we know about are covered already
+			throw error('Unable to parse unknown AST node of type ' + node.kind, node);
 		}
 	}
 }

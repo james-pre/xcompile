@@ -132,6 +132,7 @@ export function emit(u: xir.Unit): string {
 		case 'goto':
 			return `/* goto */ break ${u.target ?? ''}`;
 		case 'label':
+			if (process.env.DEBUG_NO_LABEL) return '';
 			return u.name + ':';
 		case 'unary':
 			if (u.operator == '*') return `$__deref${emitList(u.expression)}`;
@@ -158,14 +159,16 @@ export function emit(u: xir.Unit): string {
 				case 'bracket_access':
 					return primary + `[${emitList(u.post.key, true)}]`;
 				case 'call':
-					return primary + emitList(u.post.args);
+					return primary + emitList(u.post.args) + '\n';
 				default:
 					throw 'Unknown postfix: ' + (u.post as any).type;
 			}
 		}
 		case 'cast':
 			return !_emitCasts
-				? ''
+				? u.value
+					? emit(u.value)
+					: '/* <missing value> */'
 				: u.value
 					? `(${emit(u.value)} as ${emitType(u.type)})`
 					: `/* <missing value> as ${emitType(u.type)} */`;

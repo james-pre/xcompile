@@ -28,6 +28,7 @@ export interface Issue {
 	message?: string;
 	level: IssueLevel;
 	stack?: string;
+	toString?(): string;
 }
 
 export enum IssueLevel {
@@ -52,6 +53,9 @@ export function createIssueHelpers<const I>(parse: (input: I) => Pick<Issue, 'lo
 				...parse(init),
 				message,
 				level: IssueLevel[key],
+				toString() {
+					return stringifyIssue(this, { colors: true, trace: false });
+				},
 			};
 
 			emitIssue(issue);
