@@ -8,6 +8,8 @@ import { __setEntry } from '../issue.js';
 import * as clang from './clang.js';
 import * as ts from './typescript.js';
 import { cToTypescriptHeader } from './x-specific.js';
+// @ts-expect-error 2307
+import native from '../../build/Release/xcompile-native.node';
 
 export { clang, ts };
 
@@ -25,18 +27,12 @@ export function parse(lang: string, file: string, opts: ParseOptions): Iterable<
 	switch (lang) {
 		case 'clang-ast':
 			return clang.parse(JSON.parse(readFileSync(file, 'utf8')));
-		case 'c': {
+		case 'c':
+		case 'clang': {
 			__setEntry(file);
-
-			const { stdout: json, error } = spawnSync('clang', ['-Xclang', '-ast-dump=json', file], {
-				stdio: ['inherit', 'pipe', 'inherit'],
-				encoding: 'utf-8',
-				maxBuffer: 1024 ** 4,
-			});
-
-			if (error && !opts.ignoreExit) throw error.toString();
-
-			return [...clang.parse(JSON.parse(json))];
+			const nodes: xir.Unit[] = [];
+			for (const node of native.getClangAST(file, [])) nodes.push(...clang.parse(node));
+			return nodes;
 		}
 		default:
 			throw new Error('Unsupported source language: ' + lang);

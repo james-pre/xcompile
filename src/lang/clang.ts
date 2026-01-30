@@ -439,7 +439,7 @@ export interface TypeOfExprType extends GenericNode {
 }
 
 export interface Member extends GenericNode {
-	kind: 'MemberExpr';
+	kind: 'MemberExpr' | 'MemberRefExpr';
 	valueCategory: ValueCategory;
 	name: string;
 	isArrow: boolean;
@@ -842,6 +842,7 @@ function* parseRaw(node: Node): Generator<xir.Unit> {
 			};
 			return;
 		case 'MemberExpr':
+		case 'MemberRefExpr':
 			if (!node.name) {
 				/** Clang's AST will emit a member access with an empty name when accessing things like anonymous unions */
 				yield* parse(node.inner[0]);

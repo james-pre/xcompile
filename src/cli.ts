@@ -40,22 +40,22 @@ if (opt.help || !input) {
 	input: Path to input file(s)
 
 Sources:
-	c                    C, handles generation of the Clang AST automatically
-	clang-ast            C, uses a Clang AST in JSON format
+    c, clang             C, uses Clang via native bindings
+    clang-ast            C, uses a Clang AST in JSON format
 
 Targets:
-	ts, typescript       TypeScript
-	xir-text             A textual representation of the XCompile IR
-	xir-json			 The raw JSON of the XCompile IR
+    ts, typescript       TypeScript
+    xir-text             A textual representation of the XCompile IR
+    xir-json             The raw JSON of the XCompile IR
 
 Options:
-	-h, --help           Display this help message
-	-V, --version        Display version information and exit
-	-v, --verbose        Display verbose messages
-	-o, --output <path>  Write output to path
-	-k, --ignore-exit    Ignore the exit code of sub-shells
-	    --allow-dupe     Report duplicate issues
-	    --issue-entry    Set the entry point used when computing issue messages
+    -h, --help           Display this help message
+    -V, --version        Display version information and exit
+    -v, --verbose        Display verbose messages
+    -o, --output <path>  Write output to path
+    -k, --ignore-exit    Ignore the exit code of sub-shells
+        --allow-dupe     Report duplicate issues
+        --issue-entry    Set the entry point used when computing issue messages
         --emit-no-casts  Type casts will not be emitted`);
 	process.exit(1);
 }
