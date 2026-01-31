@@ -873,29 +873,13 @@ function* parseRaw(node: Node): Generator<xir.Unit> {
 		case 'StaticAssertDecl':
 		case 'StaticAssert': {
 			const [condition, message] = node.inner ?? [];
-			yield {
-				kind: 'postfixed',
-				primary: [
-					{
-						kind: 'value',
-						type: {
-							kind: 'function',
-							returns: parseType(node, 'void'),
-							args: [
-								parseType(node, condition),
-								'type' in message ? parseType(node, message) : parseType(node, 'string'),
-							],
-						},
-						content: '$__assert',
-					},
-				],
-				post: {
-					type: 'call',
-					args:
-						node.inner?.flatMap(node => parse<xir.Expression>(node)) ??
-						(warning('Static assert is empty', node), []),
-				},
-			};
+			const [{ content: conditionContent }] = parse<xir.Value>(condition);
+			if (!conditionContent) {
+				const [{ content: messageContent }] = parse<xir.Value>(message);
+				let text = 'Static assertion failed';
+				if (messageContent) text += ': ' + messageContent;
+				error(text, node);
+			}
 			return;
 		}
 		case 'SwitchStmt': {

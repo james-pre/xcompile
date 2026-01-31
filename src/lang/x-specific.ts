@@ -34,7 +34,6 @@ type $typeof<T> = {};
 declare function $ref_t<T extends Type>(t: FieldConfigInit<T>): Type<Ref<T>>;
 
 declare function $__typeof<T>(value: T): $typeof<T>;
-declare function $__assert(condition: any, message?: string | Ref<int8>): void;
 declare function $__ref<T>(value: T): Ref<T>;
 declare function $__deref<T>(value: Ref<T>): T;
 declare function $__array<T>(start: Ref<T>, i: bigint): T;

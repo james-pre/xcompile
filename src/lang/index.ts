@@ -12,6 +12,12 @@ import native from '../../lib/xcompile-native.node';
 
 export { clang, ts };
 
+Object.defineProperty(BigInt.prototype, 'toJSON', {
+	value() {
+		return this.toString();
+	},
+});
+
 export interface ParseOptions {
 	/** If set, the exit codes of sub-shells are ignored */
 	ignoreExit?: boolean;
