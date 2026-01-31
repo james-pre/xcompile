@@ -8,7 +8,7 @@ import * as clang from './clang.js';
 import * as ts from './typescript.js';
 import { cToTypescriptHeader } from './x-specific.js';
 // @ts-expect-error 2307
-import native from '../../build/Release/xcompile-native.node';
+import native from '../../lib/xcompile-native.node';
 
 export { clang, ts };
 
