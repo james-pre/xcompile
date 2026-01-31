@@ -80,6 +80,7 @@ export interface Statement extends GenericNode {
 		| 'ForStmt'
 		| 'NullStmt'
 		| 'ReturnStmt'
+		| 'StaticAssert'
 		| 'SwitchStmt'
 		| 'WhileStmt';
 	inner: Node[];
@@ -420,7 +421,7 @@ export interface Value extends GenericNode {
 		| 'StmtExpr'
 		| 'StringLiteral';
 	valueCategory: ValueCategory;
-	value?: string;
+	value?: string | { toString(): string };
 }
 
 export interface UnaryExprOrTypeTraitExpr extends GenericNode {
@@ -869,9 +870,9 @@ function* parseRaw(node: Node): Generator<xir.Unit> {
 		case 'ReturnStmt':
 			yield { kind: 'return', value: !node.inner ? [] : parse(node.inner[0]) };
 			return;
-		case 'StaticAssertDecl': {
+		case 'StaticAssertDecl':
+		case 'StaticAssert': {
 			const [condition, message] = node.inner ?? [];
-
 			yield {
 				kind: 'postfixed',
 				primary: [

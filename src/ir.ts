@@ -63,7 +63,7 @@ export function typeHasQualifier(type: Type | null, qual: TypeQualifier): boolea
 
 export type RecordInitializer = { field: string; value: Value }[];
 
-export type ValueContents = string | RecordInitializer;
+export type ValueContents = { toString(): string } | string | RecordInitializer;
 
 export interface Value {
 	kind: 'value';
@@ -298,7 +298,7 @@ export function text(u: Unit): string {
 			return `${u.type ? typeText(u.type) : '<untyped>'} ${u.name ?? u.index} ${!u.initializer ? '' : ' = ' + text(u.initializer)}`;
 		case 'value':
 			// eslint-disable-next-line @typescript-eslint/no-base-to-string
-			return `${typeof u.content == 'string' ? u.content : u.content.map ? u.content.map(({ field, value }) => field + ': ' + text(value)).join(';\n') : u.content.toString()}`;
+			return `${Array.isArray(u.content) ? u.content.map(({ field, value }) => field + ': ' + text(value)).join(';\n') : String(u.content)}`;
 		case 'comment':
 			return `/* ${u.text} */`;
 	}

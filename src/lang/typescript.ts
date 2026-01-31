@@ -84,10 +84,10 @@ function emitFieldType(type: xir.Type | null): string {
 const reserved = ['class', 'new'];
 
 function emitValue(value: xir.Value): string {
-	if (typeof value.content == 'object' && 'map' in value.content)
+	if (Array.isArray(value.content))
 		return value.content.map(({ field, value }) => field + ': ' + emit(value)).join(';\n');
 
-	if (typeof value.content != 'string') return (value.content as any).toString();
+	if (typeof value.content != 'string') return String(value.content);
 
 	// if (value.content.startsWith('"') && value.content.endsWith('"')) return `$__str(${value.content})`;
 

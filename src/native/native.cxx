@@ -329,10 +329,45 @@ CXChildVisitResult Visit(CXCursor cursor, CXCursor parent, CXClientData client_d
 	clang_disposeString(usr);
 
 	CXString name = clang_getCursorSpelling(cursor);
-	node.Set("name", String::New(env, clang_getCString(name)));
+	std::string cursorName = clang_getCString(name);
+	node.Set("name", String::New(env, cursorName));
 	clang_disposeString(name);
 
 	node.Set("loc", CreateLocation(env, cursor));
+
+	if (kind == CXCursor_IntegerLiteral || kind == CXCursor_FloatingLiteral || kind == CXCursor_ImaginaryLiteral || kind == CXCursor_CharacterLiteral || kind == CXCursor_CXXBoolLiteralExpr)
+	{
+		CXEvalResult result = clang_Cursor_Evaluate(cursor);
+		CXEvalResultKind evalKind = clang_EvalResult_getKind(result);
+
+		switch (evalKind)
+		{
+		case CXEval_Int:
+			if (clang_EvalResult_isUnsignedInt(result))
+				node.Set("value", BigInt::New(env, static_cast<uint64_t>(clang_EvalResult_getAsUnsigned(result))));
+			else
+				node.Set("value", BigInt::New(env, static_cast<int64_t>(clang_EvalResult_getAsLongLong(result))));
+			break;
+		case CXEval_Float:
+			node.Set("value", Number::New(env, clang_EvalResult_getAsDouble(result)));
+			break;
+		case CXEval_ObjCStrLiteral:
+		case CXEval_StrLiteral:
+		case CXEval_CFStr:
+		{
+			const char *str = clang_EvalResult_getAsStr(result);
+			if (str != nullptr)
+				node.Set("value", String::New(env, str));
+			break;
+		}
+		break;
+		}
+
+		clang_EvalResult_dispose(result);
+	}
+
+	if (kind == CXCursor_StringLiteral)
+		node.Set("value", String::New(env, cursorName));
 
 	CXType type = clang_getCursorType(cursor);
 	if (type.kind != CXType_Invalid)

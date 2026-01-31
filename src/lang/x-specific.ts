@@ -8,6 +8,7 @@
  * Boilerplate to make stuff with C work
  */
 export const cToTypescriptHeader = `
+// auto-included compatibility types
 import { types as t, struct, union, sizeof, Void, array } from 'memium';
 import type { StructConstructor, Type, FieldConfigInit } from 'memium';
 
@@ -33,7 +34,7 @@ type $typeof<T> = {};
 declare function $ref_t<T extends Type>(t: FieldConfigInit<T>): Type<Ref<T>>;
 
 declare function $__typeof<T>(value: T): $typeof<T>;
-declare function $__assert(condition: boolean, message?: Ref<int8>): void;
+declare function $__assert(condition: any, message?: string | Ref<int8>): void;
 declare function $__ref<T>(value: T): Ref<T>;
 declare function $__deref<T>(value: Ref<T>): T;
 declare function $__array<T>(start: Ref<T>, i: bigint): T;
@@ -42,4 +43,5 @@ declare function $__str(value: string): Ref<int8>;
 declare function $__allocConstArray<T, L extends number>(length: L, ...init: T[]): ConstArray<T, L>;
 
 declare let __func__: Ref<int8> | undefined;
+// end of auto-included compatibility types
 `;
