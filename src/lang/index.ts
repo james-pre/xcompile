@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (c) 2025 James Prevett
-import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import $pkg from '../../package.json' with { type: 'json' };
 import * as xir from '../ir.js';
@@ -30,9 +29,10 @@ export function parse(lang: string, file: string, opts: ParseOptions): Iterable<
 		case 'c':
 		case 'clang': {
 			__setEntry(file);
-			const nodes: xir.Unit[] = [];
-			for (const node of native.getClangAST(file, [])) nodes.push(...clang.parse(node));
-			return nodes;
+			const ir: xir.Unit[] = [],
+				nodes = native.getClangAST(file, []);
+			for (const node of nodes) ir.push(...clang.parse(node));
+			return ir;
 		}
 		default:
 			throw new Error('Unsupported source language: ' + lang);

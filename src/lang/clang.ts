@@ -396,6 +396,11 @@ export interface RecoveryExpr extends GenericNode {
 	valueCategory: ValueCategory;
 }
 
+export interface UnexposedExpr extends GenericNode {
+	kind: 'UnexposedExpr';
+	inner: Node[];
+}
+
 export interface Value extends GenericNode {
 	kind:
 		| 'ArraySubscriptExpr'
@@ -439,7 +444,7 @@ export interface TypeOfExprType extends GenericNode {
 }
 
 export interface Member extends GenericNode {
-	kind: 'MemberExpr' | 'MemberRefExpr';
+	kind: 'MemberExpr';
 	valueCategory: ValueCategory;
 	name: string;
 	isArrow: boolean;
@@ -523,6 +528,7 @@ export type Node =
 	| TypeTraitExpr
 	| UnaryOperator
 	| UnaryExprOrTypeTraitExpr
+	| UnexposedExpr
 	| Value;
 
 interface InterruptLike {
@@ -656,6 +662,7 @@ function* parseRaw(node: Node): Generator<xir.Unit> {
 		case 'ParenExpr':
 		case 'TranslationUnitDecl':
 		case 'StmtExpr':
+		case 'UnexposedExpr':
 			for (const inner of node.inner ?? []) yield* parse(inner);
 			return;
 		case 'RecoveryExpr':
@@ -842,7 +849,6 @@ function* parseRaw(node: Node): Generator<xir.Unit> {
 			};
 			return;
 		case 'MemberExpr':
-		case 'MemberRefExpr':
 			if (!node.name) {
 				/** Clang's AST will emit a member access with an empty name when accessing things like anonymous unions */
 				yield* parse(node.inner[0]);

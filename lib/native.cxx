@@ -78,7 +78,7 @@ const char *GetCursorKindStr(CXCursorKind kind)
 	case CXCursor_DeclRefExpr:
 		return "DeclRefExpr";
 	case CXCursor_MemberRefExpr:
-		return "MemberRefExpr";
+		return "MemberExpr";
 	case CXCursor_CallExpr:
 		return "CallExpr";
 	case CXCursor_BlockExpr:
@@ -338,6 +338,28 @@ CXChildVisitResult Visit(CXCursor cursor, CXCursor parent, CXClientData client_d
 	if (type.kind != CXType_Invalid)
 	{
 		node.Set("type", CreateTypeInfo(env, type));
+	}
+
+	if (kind == CXCursor_DeclRefExpr || kind == CXCursor_CallExpr)
+	{
+		CXCursor referenced = clang_getCursorReferenced(cursor);
+		if (clang_Cursor_isNull(referenced))
+		{
+			throw Error::New(env, "Referenced cursor is null");
+		}
+
+		Object refNode = Object::New(env);
+		CXString refName = clang_getCursorSpelling(referenced);
+		refNode.Set("name", String::New(env, clang_getCString(refName)));
+		clang_disposeString(refName);
+
+		CXType refType = clang_getCursorType(referenced);
+		if (refType.kind != CXType_Invalid)
+		{
+			refNode.Set("type", CreateTypeInfo(env, refType));
+		}
+
+		node.Set("referencedDecl", refNode);
 	}
 
 	Array inner = Array::New(env);
