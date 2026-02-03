@@ -297,7 +297,6 @@ export function text(u: Unit): string {
 		case 'parameter':
 			return `${u.type ? typeText(u.type) : '<untyped>'} ${u.name ?? u.index} ${!u.initializer ? '' : ' = ' + text(u.initializer)}`;
 		case 'value':
-			// eslint-disable-next-line @typescript-eslint/no-base-to-string
 			return `${Array.isArray(u.content) ? u.content.map(({ field, value }) => field + ': ' + text(value)).join(';\n') : String(u.content)}`;
 		case 'comment':
 			return `/* ${u.text} */`;

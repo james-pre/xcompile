@@ -28,10 +28,10 @@ function _parseLocation(loc: Location | undefined): _Location | undefined {
 }
 
 const { error, warning, note, debug } = createIssueHelpers<Node>(function __nodeToIssueInit(node) {
-	let rawLoc = _parseLocation('loc' in node ? node.loc : node.range?.begin);
+	const rawLoc = _parseLocation('loc' in node ? node.loc : node.range?.begin);
 	if (!rawLoc) return {};
 
-	let alt = _parseLocation(node.range?.end);
+	const alt = _parseLocation(node.range?.end);
 
 	return {
 		location: {
@@ -877,7 +877,7 @@ function* parseRaw(node: Node): Generator<xir.Unit> {
 			if (!conditionContent) {
 				const [{ content: messageContent }] = parse<xir.Value>(message);
 				let text = 'Static assertion failed';
-				if (messageContent) text += ': ' + messageContent;
+				if (messageContent) text += ': ' + String(messageContent);
 				error(text, node);
 			}
 			return;

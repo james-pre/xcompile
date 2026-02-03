@@ -133,7 +133,7 @@ export function stringifyIssue(i: Issue, options: Partial<IssueFormatting>): str
 	if (!i.location) return message;
 	if (!i.source) return `${locationText(i.location)}: ${message}`;
 
-	let { column, position, length = 1 } = i.location;
+	const { column, position, length = 1 } = i.location;
 	let text = i.source;
 
 	// exactly how far into the data the `position` is

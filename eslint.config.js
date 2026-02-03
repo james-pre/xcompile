@@ -17,14 +17,13 @@ export default defineConfig({
 	rules: {
 		'no-useless-escape': 'warn',
 		'no-unreachable': 'warn',
-		'no-fallthrough': 'off',
+		'no-fallthrough': 'warn',
 		'no-empty': 'warn',
 		'no-case-declarations': 'warn',
 		'prefer-const': 'warn',
 		'prefer-rest-params': 'warn',
 		'prefer-spread': 'warn',
 		'no-unused-vars': 'off',
-		'@typescript-eslint/no-fallthrough': 'warn',
 		'@typescript-eslint/no-unused-vars': 'warn',
 		'@typescript-eslint/no-inferrable-types': 'off',
 		'@typescript-eslint/no-this-alias': 'off',
@@ -48,5 +47,6 @@ export default defineConfig({
 		'@typescript-eslint/only-throw-error': 'off',
 		'@typescript-eslint/no-explicit-any': 'off',
 		'@typescript-eslint/no-empty-object-type': 'off',
+		'@typescript-eslint/no-base-to-string': 'off',
 	},
 });

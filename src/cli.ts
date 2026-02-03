@@ -60,11 +60,11 @@ Options:
 	process.exit(1);
 }
 
-let [source, target, ...rest] = formats.split(':');
+const [source, target, ...rest] = formats.split(':');
 
 if (rest.length) console.log('Ignoring: ' + rest.join(', '));
 
-let reported = new Set<string>();
+const reported = new Set<string>();
 
 onIssue(i => {
 	if (i.level == IssueLevel.Debug && !opt.verbose) return;
