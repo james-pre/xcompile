@@ -49,9 +49,8 @@
 	"dependencies": {
 		"@types/node": "^24.3.0",
 		"commander": "^14.0.0",
-		"memium": "^0.3.8",
-		"node-addon-api": "^8.5.0",
-		"utilium": "^2.5.1"
+		"memium": "^0.4.4",
+		"node-addon-api": "^8.5.0"
 	},
 	"devDependencies": {
 		"@eslint/js": "^10.0.1",
