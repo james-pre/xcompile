@@ -54,15 +54,14 @@
 		"utilium": "^2.5.1"
 	},
 	"devDependencies": {
-		"@eslint/js": "^9.17.0",
-		"@types/eslint__js": "^8.42.3",
+		"@eslint/js": "^10.0.1",
 		"cmake-js": "^8.0.0",
-		"eslint": "^9.17.0",
+		"eslint": "^10.1.0",
 		"globals": "^15.13.0",
 		"prettier": "^3.4.2",
 		"tsx": "^4.19.2",
-		"typedoc": "^0.28.14",
-		"typescript": "^5.9.3",
-		"typescript-eslint": "^8.18.0"
+		"typedoc": "^0.28.18",
+		"typescript": "^6.0.2",
+		"typescript-eslint": "^8.58.0"
 	}
 }
