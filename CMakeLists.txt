@@ -8,9 +8,8 @@ add_definitions(-DNODE_ADDON_API_CPP_EXCEPTIONS_ALL)
 
 set(CLANG_PREFIX_PATHS
 	/usr/lib/llvm-21
-	/usr/lib/llvm-20
-	/usr/lib/llvm-19
-	/usr/lib/llvm-18
+	/usr
+	/usr/local
 )
 
 find_path(CLANG_INCLUDE_DIR
@@ -20,9 +19,9 @@ find_path(CLANG_INCLUDE_DIR
 )
 
 find_library(CLANG_LIB
-	NAMES clang libclang clang-21 clang-20 clang-19 clang-18
+	NAMES clang-21 libclang libclang.so.21 libclang.so.21.1
 	PATHS ${CLANG_PREFIX_PATHS}
-	PATH_SUFFIXES lib
+	PATH_SUFFIXES lib lib64
 )
 
 if(NOT CLANG_INCLUDE_DIR)
