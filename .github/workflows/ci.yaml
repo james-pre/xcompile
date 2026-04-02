@@ -19,6 +19,11 @@ jobs:
             - name: Checkout
               uses: actions/checkout@v5
 
+            - name: Install native build dependencies
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install -y libclang-dev
+
             - name: Set up Node.js
               uses: actions/setup-node@v6
               with:
@@ -35,3 +40,6 @@ jobs:
 
             - name: Build TypeScript
               run: npm run build:ts
+
+            - name: Build Native
+              run: npm run build:native
