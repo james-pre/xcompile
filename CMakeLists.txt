@@ -6,8 +6,24 @@ add_compile_definitions(NAPI_VERSION=10)
 add_definitions(-DNODE_ADDON_API_CPP_EXCEPTIONS)
 add_definitions(-DNODE_ADDON_API_CPP_EXCEPTIONS_ALL)
 
-find_path(CLANG_INCLUDE_DIR NAMES clang-c/Index.h PATH_SUFFIXES include llvm-21/include llvm-20/include llvm-19/include llvm-18/include )
-find_library(CLANG_LIB NAMES clang libclang PATH_SUFFIXES lib llvm-21/lib llvm-20/lib llvm-19/lib llvm-18/lib)
+set(CLANG_PREFIX_PATHS
+	/usr/lib/llvm-21
+	/usr/lib/llvm-20
+	/usr/lib/llvm-19
+	/usr/lib/llvm-18
+)
+
+find_path(CLANG_INCLUDE_DIR
+	NAMES clang-c/Index.h
+	PATHS ${CLANG_PREFIX_PATHS}
+	PATH_SUFFIXES include
+)
+
+find_library(CLANG_LIB
+	NAMES clang libclang clang-21 clang-20 clang-19 clang-18
+	PATHS ${CLANG_PREFIX_PATHS}
+	PATH_SUFFIXES lib
+)
 
 if(NOT CLANG_INCLUDE_DIR)
 	message(FATAL_ERROR "Could not find clang-c/Index.h. Install libclang development headers.")
