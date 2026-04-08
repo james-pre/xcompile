@@ -1,67 +1,75 @@
 {
-	"name": "xcompile",
-	"version": "0.6.1",
-	"author": "James Prevett <jp@jamespre.dev> (https://jamespre.dev)",
-	"description": "A robust tokenizer, parser, and transpiler",
-	"main": "dist/index.js",
-	"types": "dist/index.d.ts",
-	"keywords": [],
-	"bin": {
-		"xcompile": "./dist/cli.js"
-	},
-	"files": [
-		"dist",
-		"license.md",
-		"lib"
-	],
-	"type": "module",
-	"homepage": "https://github.com/james-pre/xcompile",
-	"license": "GPL-3.0-or-later",
-	"repository": {
-		"type": "git",
-		"url": "git+https://github.com/james-pre/xcompile.git"
-	},
-	"bugs": {
-		"url": "https://github.com/james-pre/xcompile/issues"
-	},
-	"engines": {
-		"node": ">= 20"
-	},
-	"exports": {
-		".": "./dist/index.js",
-		"./*": "./dist/*.js"
-	},
-	"scripts": {
-		"format": "prettier --write .",
-		"format:check": "prettier --check .",
-		"lint": "tsc -p tsconfig.json --noEmit && eslint src",
-		"build": "bash ./scripts/build.sh",
-		"build:ts": "tsc -p tsconfig.json && chmod +x dist/cli.js",
-		"build:native": "cmake-js clean && cmake-js build",
-		"build:bnf": "npx xcompile-bnf src/bnf.bnf -f json -o src/bnf.json",
-		"build:docs": "typedoc",
-		"prepublishOnly": "npm run build"
-	},
-	"binary": {
-		"napi_versions": [
-			7
-		]
-	},
-	"dependencies": {
-		"@types/node": "^24.3.0",
-		"commander": "^14.0.0",
-		"memium": "^0.4.4",
-		"node-addon-api": "^8.5.0"
-	},
-	"devDependencies": {
-		"@eslint/js": "^10.0.1",
-		"cmake-js": "^8.0.0",
-		"eslint": "^10.1.0",
-		"globals": "^15.13.0",
-		"prettier": "^3.4.2",
-		"tsx": "^4.19.2",
-		"typedoc": "^0.28.18",
-		"typescript": "^6.0.2",
-		"typescript-eslint": "^8.58.0"
-	}
+  "name": "xcompile",
+  "version": "0.6.1",
+  "author": "James Prevett <jp@jamespre.dev> (https://jamespre.dev)",
+  "description": "A robust tokenizer, parser, and transpiler",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "keywords": [],
+  "bin": {
+    "xcompile": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "license.md",
+    "lib"
+  ],
+  "type": "module",
+  "homepage": "https://github.com/james-pre/xcompile",
+  "license": "GPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/james-pre/xcompile.git"
+  },
+  "bugs": {
+    "url": "https://github.com/james-pre/xcompile/issues"
+  },
+  "engines": {
+    "node": ">= 20"
+  },
+  "exports": {
+    ".": "./dist/index.js",
+    "./*": "./dist/*.js"
+  },
+  "scripts": {
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "tsc -p tsconfig.json --noEmit && eslint src",
+    "build": "bash ./scripts/build.sh",
+    "build:ts": "tsc -p tsconfig.json && chmod +x dist/cli.js",
+    "build:native": "cmake-js clean && cmake-js build",
+    "build:bnf": "npx xcompile-bnf src/bnf.bnf -f json -o src/bnf.json",
+    "build:docs": "typedoc",
+    "prepublishOnly": "npm run build"
+  },
+  "binary": {
+    "napi_versions": [
+      7
+    ]
+  },
+  "dependencies": {
+    "@types/node": "^24.3.0",
+    "commander": "^14.0.0",
+    "memium": "^0.4.4",
+    "node-addon-api": "^8.5.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "cmake-js": "^8.0.0",
+    "eslint": "^10.1.0",
+    "globals": "^15.13.0",
+    "prettier": "^3.4.2",
+    "tsx": "^4.19.2",
+    "typedoc": "^0.28.18",
+    "typescript": "^6.0.2",
+    "typescript-eslint": "^8.58.0"
+  },
+  "prettier": {
+    "singleQuote": true,
+    "useTabs": true,
+    "trailingComma": "es5",
+    "tabWidth": 4,
+    "printWidth": 120,
+    "arrowParens": "avoid"
+  }
 }
